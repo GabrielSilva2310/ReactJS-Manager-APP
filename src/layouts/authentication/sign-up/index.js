@@ -26,6 +26,7 @@ import MDTypography from "components/MDTypography";
 import MDInput from "components/MDInput";
 import MDButton from "components/MDButton";
 import BasicLayout from "../components/BasicLayout";
+import { Divider } from "@mui/material";
 
 function SignUp() {
   return (
@@ -36,7 +37,34 @@ function SignUp() {
             Crie sua conta no ManagerApp
           </MDTypography>
         </MDBox>
-
+         <MDButton
+           variant="outlined"
+           fullWidth
+           sx={{
+           mb: 2,
+           textTransform: "none",
+           justifyContent: "center",
+           borderColor: "#ccc",
+           color: "#555",
+           "&:hover": { backgroundColor: "#f5f5f5" },
+          }}
+          startIcon={
+            <img
+              src="https://developers.google.com/identity/images/g-logo.png"
+              alt="Google"
+              style={{ width: 20, height: 20 }}
+             /> 
+          }
+           >
+          Continuar com Google
+        </MDButton>
+         <MDBox display="flex" alignItems="center" my={2}>
+          <Divider sx={{ flex: 1 }} />
+          <MDTypography variant="button" color="text" mx={2}>
+            ou cadastre-se com email
+          </MDTypography>
+          <Divider sx={{ flex: 1 }} />
+        </MDBox>
         <MDBox component="form" role="form">
           <MDBox mb={2}>
             <MDInput type="text" label="Nome" fullWidth />
@@ -47,10 +75,6 @@ function SignUp() {
           <MDBox mb={2}>
             <MDInput type="password" label="Senha" fullWidth />
           </MDBox>
-          <MDBox mb={2}>
-            <MDInput type="password" label="Confirmar Senha" fullWidth />
-          </MDBox>
-
           <MDBox mt={3} mb={1}>
             <MDButton variant="gradient" color="info" fullWidth>
               CADASTRAR
