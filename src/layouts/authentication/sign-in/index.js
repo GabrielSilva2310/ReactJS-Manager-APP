@@ -56,6 +56,27 @@ function Basic() {
         </MDBox>
         <MDBox pt={4} pb={3} px={3}>
           <MDBox component="form" role="form">
+            <MDButton
+          variant="outlined"
+          fullWidth
+          sx={{
+             mb: 2,
+             textTransform: "none",
+             justifyContent: "center",
+             borderColor: "#ccc",
+             color: "#555",
+             "&:hover": { backgroundColor: "#f5f5f5" },
+           }}
+           startIcon={
+            <img
+              src="https://developers.google.com/identity/images/g-logo.png"
+              alt="Google"
+              style={{ width: 20, height: 20 }}
+             />
+            }
+          >
+            Continuar com Google
+          </MDButton>
             <MDBox mb={2}>
               <MDInput type="email" label="Email" fullWidth />
             </MDBox>
