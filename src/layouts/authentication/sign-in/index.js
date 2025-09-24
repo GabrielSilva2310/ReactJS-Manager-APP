@@ -75,16 +75,7 @@ function Basic() {
               </MDTypography>
             </MDBox>
             <MDBox mt={4} mb={1}>
-              <MDButton
-                fullWidth
-                sx={{
-                backgroundColor: "#1976D2",
-                color: "#fff",
-                fontWeight: "bold",
-                textTransform: "uppercase",
-                "&:hover": { backgroundColor: "#1565C0", },
-                }}
-              >
+              <MDButton variant="gradient" color="info" fullWidth>
                 Entrar
               </MDButton>
             </MDBox>
