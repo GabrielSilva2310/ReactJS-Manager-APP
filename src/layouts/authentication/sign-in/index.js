@@ -13,21 +13,14 @@ Coded by www.creative-tim.com
 * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 */
 
-import { useState } from "react";
+import { useContext, useState } from "react";
 
 // react-router-dom components
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 // @mui material components
 import Card from "@mui/material/Card";
 import Switch from "@mui/material/Switch";
-import Grid from "@mui/material/Grid";
-import MuiLink from "@mui/material/Link";
-
-// @mui icons
-import FacebookIcon from "@mui/icons-material/Facebook";
-import GitHubIcon from "@mui/icons-material/GitHub";
-import GoogleIcon from "@mui/icons-material/Google";
 
 // Material Dashboard 2 React components
 import MDBox from "components/MDBox";
@@ -40,11 +33,43 @@ import BasicLayout from "layouts/authentication/components/BasicLayout";
 
 // Images
 import bgImage from "assets/images/bg-sign-in-basic.jpeg";
+import { AuthContext } from "contexts/AuthContext";
 
-function Basic() {
+function SignIn() {
   const [rememberMe, setRememberMe] = useState(false);
 
   const handleSetRememberMe = () => setRememberMe(!rememberMe);
+
+
+   // 🔧 estados controlados do formulário
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  // 🔧 estados de UI
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  // 🔧 navegação e contexto de auth
+  const navigate = useNavigate();
+  const { signIn } = useContext(AuthContext);
+
+  // 🔧 submit do formulário
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      await signIn(email, password); // chama login -> salva token -> chama /me
+      // Se quiser usar "lembrar-me" pra persistir em localStorage vs sessionStorage,
+      // depois te mostro como ajustar o auth.js pra respeitar esse flag.
+      navigate("/dashboard");
+    } catch (err) {
+      setError("Usuário ou senha inválidos.");
+    } finally {
+      setLoading(false);
+    }
+  }
+  
 
   return (
     <BasicLayout image={bgImage}>
@@ -55,7 +80,7 @@ function Basic() {
           </MDTypography>
         </MDBox>
         <MDBox pt={4} pb={3} px={3}>
-          <MDBox component="form" role="form">
+          <MDBox component="form" role="form" onSubmit={handleSubmit}>
             <MDButton
           variant="outlined"
           fullWidth
@@ -74,14 +99,30 @@ function Basic() {
               style={{ width: 20, height: 20 }}
              />
             }
+             // onClick={() => ... auth com Google no futuro }
+            type="button"
           >
             Continuar com Google
           </MDButton>
             <MDBox mb={2}>
-              <MDInput type="email" label="Email" fullWidth />
+              <MDInput 
+              type="email" 
+              label="Email" 
+              fullWidth
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="username"
+              required/>
             </MDBox>
             <MDBox mb={2}>
-              <MDInput type="password" label="Senha" fullWidth />
+              <MDInput 
+               type="password"
+               label="Senha"
+               fullWidth
+               value={password}
+               onChange={(e) => setPassword(e.target.value)} 
+               autoComplete="current-password"
+               required/>
             </MDBox>
             <MDBox display="flex" alignItems="center" ml={-1}>
               <Switch checked={rememberMe} onChange={handleSetRememberMe} />
@@ -95,9 +136,25 @@ function Basic() {
                 &nbsp;&nbsp;Lembrar-me
               </MDTypography>
             </MDBox>
+
+            {/* 🔧 mensagem de erro (opcional) */}
+            {error && (
+              <MDBox mt={2}>
+                <MDTypography variant="button" color="error">
+                  {error}
+                </MDTypography>
+              </MDBox>
+            )}
+
             <MDBox mt={4} mb={1}>
-              <MDButton variant="gradient" color="info" fullWidth>
-                Entrar
+              <MDButton
+              type="submit" 
+              variant="gradient" 
+              color="info" 
+              fullWidth
+              disabled={loading}
+              >
+                {loading ? "Entrando..." : "Entrar"}  
               </MDButton>
             </MDBox>
             <MDBox mt={3} mb={1} textAlign="center">
@@ -122,4 +179,4 @@ function Basic() {
   );
 }
 
-export default Basic;
+export default SignIn;
