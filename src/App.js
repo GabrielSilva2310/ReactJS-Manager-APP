@@ -52,6 +52,7 @@ import { useMaterialUIController, setMiniSidenav, setOpenConfigurator } from "co
 // Images
 import brandWhite from "assets/images/logo-ct.png";
 import brandDark from "assets/images/logo-ct-dark.png";
+import PrivateRoute from "routes/PrivateRoute";
 
 export default function App() {
   const [controller, dispatch] = useMaterialUIController();
@@ -109,18 +110,29 @@ export default function App() {
     document.scrollingElement.scrollTop = 0;
   }, [pathname]);
 
-  const getRoutes = (allRoutes) =>
-    allRoutes.map((route) => {
-      if (route.collapse) {
-        return getRoutes(route.collapse);
-      }
+ const getRoutes = (allRoutes) =>
+  allRoutes.map((route) => {
+    if (route.collapse) {
+      return getRoutes(route.collapse);
+    }
 
-      if (route.route) {
-        return <Route exact path={route.route} element={route.component} key={route.key} />;
-      }
+    if (route.route) {
+      const element = route.private
+        ? <PrivateRoute>{route.component}</PrivateRoute>
+        : route.component;
 
-      return null;
-    });
+      return (
+        <Route
+          exact
+          path={route.route}
+          element={element}
+          key={route.key || route.route}
+        />
+      );
+    }
+
+    return null;
+  });
 
   const configsButton = (
     <MDBox
@@ -191,7 +203,7 @@ export default function App() {
       {layout === "vr" && <Configurator />}
       <Routes>
         {getRoutes(routes)}
-        <Route path="*" element={<Navigate to="/dashboard" />} />
+        + <Route path="*" element={<Navigate to="/authentication/sign-in" replace />} />
       </Routes>
     </ThemeProvider>
   );

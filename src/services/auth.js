@@ -30,6 +30,14 @@ export function getTokenData() {
   return null;
 }
 
+// Helper: valida o JWT considerando uma margem (clock skew)
+export function isTokenValid(skewSeconds = 30) {
+  const td = getTokenData(); // já existe no seu arquivo
+  if (!td?.exp) return false;               // sem exp -> inválido
+  const nowSec = Date.now() / 1000;         // ms -> s
+  return nowSec < (td.exp - skewSeconds);   // válido com folga
+}
+
 export async function login(username, password) {
   const data = new URLSearchParams();
   data.append("grant_type", "password");
@@ -50,3 +58,4 @@ export async function getMe() {
   const response = await api.get("/users/me");
   return response.data;
 }
+

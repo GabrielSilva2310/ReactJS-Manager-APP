@@ -13,4 +13,22 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+
+api.interceptors.response.use(
+  (res) => res,
+  (error) => {
+    if (error.response?.status === 401) {
+      try {
+        localStorage.removeItem("com.mybusiness.managerapp/authToken:v1");
+        sessionStorage.removeItem("com.mybusiness.managerapp/authToken:v1");
+      } finally {
+        if (window.location.pathname !== "/authentication/sign-in") {
+          window.location.href = "/authentication/sign-in";
+        }
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default api;
