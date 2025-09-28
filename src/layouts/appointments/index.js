@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getAppointments } from "services/appointments";
+import { getAppointments, cancelAppointment } from "services/appointments";
 
 // MUI Components
 import DataTable from "examples/Tables/DataTable";
@@ -20,25 +20,55 @@ const formatStatus = (status) => {
   }
 };
 
+// Traduções de mensagens de erro vindas do backend
+const errorTranslations = {
+  "Appointment not found": "Agendamento não encontrado",
+  "Only scheduled appointments can be canceled": "Somente agendamentos em andamento podem ser cancelados",
+  "Appointments can only be canceled": "Agendamentos só podem ser cancelados com antecedência mínima",
+};
+
+function translateError(msg) {
+  for (const key in errorTranslations) {
+    if (msg.includes(key)) {
+      return errorTranslations[key];
+    }
+  }
+  return msg; // fallback: retorna mensagem original
+}
+
 function AppointmentsTable() {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    getAppointments()
-      .then((data) => setAppointments(data))
-      .finally(() => setLoading(false));
-  }, []);
-
-  // handlers para ações
-  const handleEdit = (appointment) => {
-    console.log("Editar:", appointment);
-    // aqui depois abriremos o modal de edição
+  const loadAppointments = async () => {
+    setLoading(true);
+    try {
+      const data = await getAppointments();
+      setAppointments(data);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleCancel = (id) => {
-    console.log("Cancelar:", id);
-    // aqui depois vamos chamar o service cancelAppointment()
+  useEffect(() => {
+    loadAppointments();
+  }, []);
+
+  const handleEdit = (appointment) => {
+    console.log("Editar:", appointment);
+  };
+
+  const handleCancel = async (id) => {
+    if (window.confirm("Tem certeza que deseja cancelar este agendamento?")) {
+      try {
+        await cancelAppointment(id);
+        await loadAppointments();
+      } catch (err) {
+        const backendMessage = err.response?.data?.error || "Erro inesperado";
+        alert(translateError(backendMessage));
+        console.error("Erro ao cancelar appointment:", err);
+      }
+    }
   };
 
   return (
