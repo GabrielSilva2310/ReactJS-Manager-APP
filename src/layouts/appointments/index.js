@@ -2,11 +2,9 @@ import { useEffect, useState } from "react";
 import { getAppointments } from "services/appointments";
 
 // MUI Components
-import Card from "@mui/material/Card";
-import Icon from "@mui/material/Icon";
-import MDBox from "components/MDBox";
-import MDTypography from "components/MDTypography";
 import DataTable from "examples/Tables/DataTable";
+import IconButton from "@mui/material/IconButton";
+import Tooltip from "@mui/material/Tooltip";
 
 // Função auxiliar para formatar status
 const formatStatus = (status) => {
@@ -32,30 +30,64 @@ function AppointmentsTable() {
       .finally(() => setLoading(false));
   }, []);
 
+  // handlers para ações
+  const handleEdit = (appointment) => {
+    console.log("Editar:", appointment);
+    // aqui depois abriremos o modal de edição
+  };
+
+  const handleCancel = (id) => {
+    console.log("Cancelar:", id);
+    // aqui depois vamos chamar o service cancelAppointment()
+  };
+
   return (
     <DataTable
-  table={{
-    columns: [
-      { Header: "Cliente", accessor: "client" },
-      { Header: "Título", accessor: "title" },
-      { Header: "Data/Horário", accessor: "dateTime" },
-      { Header: "Status", accessor: "status" },
-    ],
-    rows: appointments.map((a) => ({
-      client: a.client?.name,
-      title: a.title,
-      dateTime: new Date(a.dateTime).toLocaleString("pt-BR", {
-        dateStyle: "short",
-        timeStyle: "short",
-      }),
-      status: a.status,
-    })),
-  }}
-  isSorted={false}
-  entriesPerPage={false}
-  showTotalEntries={false}
-  noEndBorder
-/>
+      table={{
+        columns: [
+          { Header: "Cliente", accessor: "client" },
+          { Header: "Título", accessor: "title" },
+          { Header: "Data/Horário", accessor: "dateTime" },
+          { Header: "Status", accessor: "status" },
+          { Header: "Ações", accessor: "actions", align: "center" },
+        ],
+        rows: appointments.map((a) => ({
+          client: a.client?.name,
+          title: a.title,
+          dateTime: new Date(a.dateTime).toLocaleString("pt-BR", {
+            dateStyle: "short",
+            timeStyle: "short",
+          }),
+          status: formatStatus(a.status),
+          actions: (
+            <>
+              <Tooltip title="Editar">
+                <IconButton
+                  color="primary"
+                  size="small"
+                  onClick={() => handleEdit(a)}
+                >
+                  <i className="material-icons">edit</i>
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Cancelar">
+                <IconButton
+                  color="error"
+                  size="small"
+                  onClick={() => handleCancel(a.id)}
+                >
+                  <i className="material-icons">close</i>
+                </IconButton>
+              </Tooltip>
+            </>
+          ),
+        })),
+      }}
+      isSorted={false}
+      entriesPerPage={false}
+      showTotalEntries={false}
+      noEndBorder
+    />
   );
 }
 
