@@ -2,15 +2,6 @@
 =========================================================
 * Material Dashboard 2 React - v2.2.0
 =========================================================
-
-* Product Page: https://www.creative-tim.com/product/material-dashboard-react
-* Copyright 2023 Creative Tim (https://www.creative-tim.com)
-
-Coded by www.creative-tim.com
-
- =========================================================
-
-* The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 */
 
 import { useState, useEffect, useMemo } from "react";
@@ -43,16 +34,19 @@ import rtlPlugin from "stylis-plugin-rtl";
 import { CacheProvider } from "@emotion/react";
 import createCache from "@emotion/cache";
 
-// Material Dashboard 2 React routes
+// Rotas
 import routes from "routes";
+import PrivateRoute from "routes/PrivateRoute";
 
-// Material Dashboard 2 React contexts
+// Context do template
 import { useMaterialUIController, setMiniSidenav, setOpenConfigurator } from "context";
+
+// Helpers de auth
+import { isTokenValid } from "services/auth";
 
 // Images
 import brandWhite from "assets/images/logo-ct.png";
 import brandDark from "assets/images/logo-ct-dark.png";
-import PrivateRoute from "routes/PrivateRoute";
 
 export default function App() {
   const [controller, dispatch] = useMaterialUIController();
@@ -76,7 +70,6 @@ export default function App() {
       key: "rtl",
       stylisPlugins: [rtlPlugin],
     });
-
     setRtlCache(cacheRtl);
   }, []);
 
@@ -110,29 +103,38 @@ export default function App() {
     document.scrollingElement.scrollTop = 0;
   }, [pathname]);
 
- const getRoutes = (allRoutes) =>
-  allRoutes.map((route) => {
-    if (route.collapse) {
-      return getRoutes(route.collapse);
-    }
+  // Envolve componentes de rotas com PrivateRoute quando 'private: true'
+  const getRoutes = (allRoutes) =>
+    allRoutes.map((route) => {
+      if (route.collapse) return getRoutes(route.collapse);
 
-    if (route.route) {
-      const element = route.private
-        ? <PrivateRoute>{route.component}</PrivateRoute>
-        : route.component;
+      if (route.route) {
+        const element = route.private ? (
+          <PrivateRoute>{route.component}</PrivateRoute>
+        ) : (
+          route.component
+        );
 
-      return (
-        <Route
-          exact
-          path={route.route}
-          element={element}
-          key={route.key || route.route}
-        />
-      );
-    }
+        return (
+          <Route
+            path={route.route}
+            element={element}
+            key={route.key || route.route}
+          />
+        );
+      }
+      return null;
+    });
 
-    return null;
-  });
+  // 👉 Filtra itens do menu quando autenticado (esconde Sign In / Sign Up)
+  const auth = isTokenValid();
+  const menuRoutes = auth
+    ? routes.filter(
+        (r) =>
+          r.route !== "/authentication/sign-in" &&
+          r.route !== "/authentication/sign-up"
+      )
+    : routes;
 
   const configsButton = (
     <MDBox
@@ -168,7 +170,7 @@ export default function App() {
               color={sidenavColor}
               brand={(transparentSidenav && !darkMode) || whiteSidenav ? brandDark : brandWhite}
               brandName="Manager APP"
-              routes={routes}
+              routes={menuRoutes}  
               onMouseEnter={handleOnMouseEnter}
               onMouseLeave={handleOnMouseLeave}
             />
@@ -178,8 +180,8 @@ export default function App() {
         )}
         {layout === "vr" && <Configurator />}
         <Routes>
-          {getRoutes(routes)}
-          <Route path="*" element={<Navigate to="/dashboard" />} />
+          {getRoutes(routes)} {/* ← todas as rotas continuam registradas */}
+          <Route path="*" element={<Navigate to="/authentication/sign-in" replace />} />
         </Routes>
       </ThemeProvider>
     </CacheProvider>
@@ -192,7 +194,7 @@ export default function App() {
             color={sidenavColor}
             brand={(transparentSidenav && !darkMode) || whiteSidenav ? brandDark : brandWhite}
             brandName="Manager APP"
-            routes={routes}
+            routes={menuRoutes}  
             onMouseEnter={handleOnMouseEnter}
             onMouseLeave={handleOnMouseLeave}
           />
@@ -202,8 +204,8 @@ export default function App() {
       )}
       {layout === "vr" && <Configurator />}
       <Routes>
-        {getRoutes(routes)}
-        + <Route path="*" element={<Navigate to="/authentication/sign-in" replace />} />
+        {getRoutes(routes)} {/* ← todas as rotas continuam registradas */}
+        <Route path="*" element={<Navigate to="/authentication/sign-in" replace />} />
       </Routes>
     </ThemeProvider>
   );
