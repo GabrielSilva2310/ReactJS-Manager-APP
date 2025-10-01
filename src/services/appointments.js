@@ -19,3 +19,13 @@ export async function updateAppointment(id, data) {
   const response = await api.put(`/appointments/${id}`, data);
    return response.data;
 }
+
+export async function doneAppointment(id) {
+  const response = await api.put(`/appointments/${id}/done`);
+  return response.data;
+}
+
+export async function noShowAppointment(id) {
+  const response = await api.put(`/appointments/${id}/noShow`);
+  return response.data;
+}

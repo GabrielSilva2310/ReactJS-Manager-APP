@@ -4,6 +4,8 @@ import {
   cancelAppointment,
   createAppointment,
   updateAppointment,
+  doneAppointment,
+  noShowAppointment,
 } from "services/appointments";
 import { getClients } from "services/clients";
 
@@ -32,6 +34,8 @@ const formatStatus = (status) => {
       return "Cancelado";
     case 2:
       return "Concluído";
+    case 3:
+      return "Não Compareceu";
     default:
       return status;
   }
@@ -83,6 +87,36 @@ function AppointmentsTable() {
     if (window.confirm("Tem certeza que deseja cancelar este agendamento?")) {
       try {
         await cancelAppointment(id);
+        await loadAppointments();
+      } catch (err) {
+        const backendMessage =
+          err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Erro inesperado";
+        alert(translateError(backendMessage));
+      }
+    }
+  };
+
+  const handleDone = async (id) => {
+    if (window.confirm("Marcar este agendamento como concluído?")) {
+      try {
+        await doneAppointment(id);
+        await loadAppointments();
+      } catch (err) {
+        const backendMessage =
+          err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Erro inesperado";
+        alert(translateError(backendMessage));
+      }
+    }
+  };
+
+  const handleNoShow = async (id) => {
+    if (window.confirm("Marcar este agendamento como 'Não compareceu'?")) {
+      try {
+        await noShowAppointment(id);
         await loadAppointments();
       } catch (err) {
         const backendMessage =
@@ -199,7 +233,7 @@ function AppointmentsTable() {
           columns: [
             { Header: "Cliente", accessor: "client" },
             { Header: "Título", accessor: "title" },
-            { Header: "Descrição", accessor: "description" }, // 👈 nova coluna
+            { Header: "Descrição", accessor: "description" },
             { Header: "Data/Horário", accessor: "dateTime" },
             { Header: "Status", accessor: "status" },
             { Header: "Ações", accessor: "actions", align: "center" },
@@ -207,7 +241,7 @@ function AppointmentsTable() {
           rows: appointments.map((a) => ({
             client: a.client?.name,
             title: a.title,
-            description: a.description, // 👈 valor da descrição
+            description: a.description,
             dateTime: new Date(a.dateTime).toLocaleString("pt-BR", {
               dateStyle: "short",
               timeStyle: "short",
@@ -231,6 +265,24 @@ function AppointmentsTable() {
                     onClick={() => handleCancel(a.id)}
                   >
                     <i className="material-icons">close</i>
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Concluir">
+                  <IconButton
+                    color="success"
+                    size="small"
+                    onClick={() => handleDone(a.id)}
+                  >
+                    <i className="material-icons">check</i>
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Não Compareceu">
+                  <IconButton
+                    color="warning"
+                    size="small"
+                    onClick={() => handleNoShow(a.id)}
+                  >
+                    <i className="material-icons">block</i>
                   </IconButton>
                 </Tooltip>
               </>
@@ -260,7 +312,7 @@ function AppointmentsTable() {
                 }
                 error={!!fieldErrors.title}
                 helperText={fieldErrors.title}
-                disabled={!!editingId} // título não editável
+                disabled={!!editingId}
               />
             </Grid>
             <Grid item xs={12}>
@@ -301,7 +353,7 @@ function AppointmentsTable() {
                 error={!!fieldErrors.clientId}
                 helperText={fieldErrors.clientId}
                 InputLabelProps={{ shrink: true }}
-                disabled={!!editingId} // cliente não editável
+                disabled={!!editingId}
               >
                 {clients.map((c) => (
                   <MenuItem key={c.id} value={String(c.id)}>
