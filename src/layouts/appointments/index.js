@@ -24,9 +24,11 @@ import MenuItem from "@mui/material/MenuItem";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Typography from "@mui/material/Typography";
-import { StaticDatePicker, LocalizationProvider } from "@mui/x-date-pickers";
+import { StaticDatePicker, LocalizationProvider, PickersDay } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc"; // suporte a UTC
+import timezone from "dayjs/plugin/timezone"; // suporte a timezone local
 import { ThemeProvider, createTheme, useTheme } from "@mui/material/styles";
 
 // Creative Tim component
@@ -35,6 +37,10 @@ import MDBox from "components/MDBox";
 // Utils
 import { translateError } from "utils/errorTranslator";
 
+dayjs.extend(utc);
+dayjs.extend(timezone); // habilita .tz()
+
+// Função auxiliar para formatar status
 const formatStatus = (status) => {
   switch (status) {
     case 0:
@@ -66,7 +72,7 @@ function AppointmentsTable() {
   });
   const [fieldErrors, setFieldErrors] = useState({});
 
-  // 🧩 Herdar o tema base do Material Dashboard e sobrescrever apenas o calendário
+  // 🧩 Herda o tema global e sobrescreve o estilo do calendário
   const baseTheme = useTheme();
 
   const theme = createTheme({
@@ -77,7 +83,7 @@ function AppointmentsTable() {
         styleOverrides: {
           root: {
             "&.Mui-selected": {
-              backgroundColor: "#1A73E8 !important", // azul padrão ManagerApp
+              backgroundColor: "#1A73E8 !important", // azul ManagerApp
               color: "#fff",
               "&:hover": {
                 backgroundColor: "#1669c1 !important",
@@ -279,9 +285,40 @@ function AppointmentsTable() {
                   displayStaticWrapperAs="desktop"
                   value={selectedDate}
                   onChange={(newDate) => setSelectedDate(newDate)}
+                  onMonthChange={(newMonth) => setSelectedDate(newMonth)}
                   sx={{
                     "& .MuiPickersDay-root": { fontSize: "0.9rem" },
                     "& .MuiDayCalendar-weekDayLabel": { fontWeight: 600 },
+                  }}
+                  renderDay={(day, _value, DayComponentProps) => {
+                    // ✅ Corrigido: converte UTC → fuso local antes da comparação
+                    const appointment = appointments.find((a) => {
+                      const appointmentLocal = dayjs(a.dateTime).tz(dayjs.tz.guess());
+                      return appointmentLocal.isSame(day, "day");
+                    });
+
+                    const isPast = day.isBefore(dayjs(), "day");
+                    const isOutsideMonth = day.month() !== selectedDate.month();
+
+                    return (
+                      <div style={{ position: "relative" }}>
+                        <PickersDay {...DayComponentProps} />
+                        {appointment && !isOutsideMonth && (
+                          <span
+                            style={{
+                              width: 6,
+                              height: 6,
+                              borderRadius: "50%",
+                              backgroundColor: isPast ? "#b0b0b0" : "#1A73E8",
+                              position: "absolute",
+                              bottom: 4,
+                              left: "50%",
+                              transform: "translateX(-50%)",
+                            }}
+                          />
+                        )}
+                      </div>
+                    );
                   }}
                 />
               </LocalizationProvider>
