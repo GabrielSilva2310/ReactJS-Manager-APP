@@ -27,20 +27,16 @@ import Typography from "@mui/material/Typography";
 import { StaticDatePicker, LocalizationProvider, PickersDay } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs from "dayjs";
-import utc from "dayjs/plugin/utc"; // suporte a UTC
-import timezone from "dayjs/plugin/timezone"; // suporte a timezone local
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
 import { ThemeProvider, createTheme, useTheme } from "@mui/material/styles";
-
-// Creative Tim component
 import MDBox from "components/MDBox";
-
-// Utils
 import { translateError } from "utils/errorTranslator";
 
 dayjs.extend(utc);
-dayjs.extend(timezone); // habilita .tz()
+dayjs.extend(timezone);
 
-// Função auxiliar para formatar status
+// Função auxiliar de status
 const formatStatus = (status) => {
   switch (status) {
     case 0:
@@ -60,7 +56,6 @@ function AppointmentsTable() {
   const [appointments, setAppointments] = useState([]);
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
-
   const [selectedDate, setSelectedDate] = useState(dayjs());
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -72,9 +67,8 @@ function AppointmentsTable() {
   });
   const [fieldErrors, setFieldErrors] = useState({});
 
-  // 🧩 Herda o tema global e sobrescreve o estilo do calendário
+  // Herda tema global e personaliza seleção do calendário
   const baseTheme = useTheme();
-
   const theme = createTheme({
     ...baseTheme,
     components: {
@@ -83,21 +77,18 @@ function AppointmentsTable() {
         styleOverrides: {
           root: {
             "&.Mui-selected": {
-              backgroundColor: "#1A73E8 !important", // azul ManagerApp
+              backgroundColor: "#1A73E8 !important",
               color: "#fff",
-              "&:hover": {
-                backgroundColor: "#1669c1 !important",
-              },
+              "&:hover": { backgroundColor: "#1669c1 !important" },
             },
-            "&.MuiPickersDay-today": {
-              borderColor: "#1A73E8",
-            },
+            "&.MuiPickersDay-today": { borderColor: "#1A73E8" },
           },
         },
       },
     },
   });
 
+  // ===== LOAD DATA =====
   const loadAppointments = async () => {
     setLoading(true);
     try {
@@ -122,17 +113,15 @@ function AppointmentsTable() {
     loadClients();
   }, []);
 
+  // ===== ACTIONS =====
   const handleCancel = async (id) => {
     if (window.confirm("Tem certeza que deseja cancelar este agendamento?")) {
       try {
         await cancelAppointment(id);
         await loadAppointments();
       } catch (err) {
-        const backendMessage =
-          err.response?.data?.message ||
-          err.response?.data?.error ||
-          "Erro inesperado";
-        alert(translateError(backendMessage));
+        const msg = err.response?.data?.message || err.response?.data?.error || "Erro inesperado";
+        alert(translateError(msg));
       }
     }
   };
@@ -143,11 +132,8 @@ function AppointmentsTable() {
         await doneAppointment(id);
         await loadAppointments();
       } catch (err) {
-        const backendMessage =
-          err.response?.data?.message ||
-          err.response?.data?.error ||
-          "Erro inesperado";
-        alert(translateError(backendMessage));
+        const msg = err.response?.data?.message || err.response?.data?.error || "Erro inesperado";
+        alert(translateError(msg));
       }
     }
   };
@@ -158,11 +144,8 @@ function AppointmentsTable() {
         await noShowAppointment(id);
         await loadAppointments();
       } catch (err) {
-        const backendMessage =
-          err.response?.data?.message ||
-          err.response?.data?.error ||
-          "Erro inesperado";
-        alert(translateError(backendMessage));
+        const msg = err.response?.data?.message || err.response?.data?.error || "Erro inesperado";
+        alert(translateError(msg));
       }
     }
   };
@@ -174,27 +157,22 @@ function AppointmentsTable() {
         clientId: Number(formData.clientId),
         dateTime: new Date(formData.dateTime).toISOString(),
       };
-
       await createAppointment(payload);
-
       setOpen(false);
       setFormData({ title: "", description: "", dateTime: "", clientId: "" });
       setFieldErrors({});
       await loadAppointments();
     } catch (err) {
       const data = err.response?.data;
-
       if (data?.errors && Array.isArray(data.errors)) {
         const newErrors = {};
         data.errors.forEach((e) => {
-          if (e.fieldName && e.message) {
-            newErrors[e.fieldName] = translateError(e.message);
-          }
+          if (e.fieldName && e.message) newErrors[e.fieldName] = translateError(e.message);
         });
         setFieldErrors(newErrors);
       } else {
-        const backendMessage = data?.message || data?.error || "Erro inesperado";
-        alert(translateError(backendMessage));
+        const msg = data?.message || data?.error || "Erro inesperado";
+        alert(translateError(msg));
       }
     }
   };
@@ -218,9 +196,7 @@ function AppointmentsTable() {
         description: formData.description,
         dateTime: new Date(formData.dateTime).toISOString(),
       };
-
       await updateAppointment(editingId, payload);
-
       setOpen(false);
       setEditingId(null);
       setFormData({ title: "", description: "", dateTime: "", clientId: "" });
@@ -228,32 +204,31 @@ function AppointmentsTable() {
       await loadAppointments();
     } catch (err) {
       const data = err.response?.data;
-
       if (data?.errors && Array.isArray(data.errors)) {
         const newErrors = {};
         data.errors.forEach((e) => {
-          if (e.fieldName && e.message) {
-            newErrors[e.fieldName] = translateError(e.message);
-          }
+          if (e.fieldName && e.message) newErrors[e.fieldName] = translateError(e.message);
         });
         setFieldErrors(newErrors);
       } else {
-        const backendMessage = data?.message || data?.error || "Erro inesperado";
-        alert(translateError(backendMessage));
+        const msg = data?.message || data?.error || "Erro inesperado";
+        alert(translateError(msg));
       }
     }
   };
 
+  // Filtro por data
   const filteredAppointments = appointments.filter((a) =>
     dayjs(a.dateTime).isSame(selectedDate, "day")
   );
 
+  // ===== RENDER =====
   return (
     <ThemeProvider theme={theme}>
       <MDBox pt={3} pb={3} px={2} ml={{ xs: 0, lg: 30 }}>
         <Card sx={{ borderRadius: 3, boxShadow: 3, p: 2 }}>
           <CardContent>
-            {/* Cabeçalho */}
+            {/* Header */}
             <MDBox display="flex" justifyContent="space-between" alignItems="center" mb={3}>
               <Typography variant="h5" fontWeight="bold" color="text.primary">
                 Agendamentos
@@ -264,12 +239,7 @@ function AppointmentsTable() {
                 sx={{ height: "40px", color: "#fff" }}
                 onClick={() => {
                   setEditingId(null);
-                  setFormData({
-                    title: "",
-                    description: "",
-                    dateTime: "",
-                    clientId: "",
-                  });
+                  setFormData({ title: "", description: "", dateTime: "", clientId: "" });
                   setFieldErrors({});
                   setOpen(true);
                 }}
@@ -278,8 +248,18 @@ function AppointmentsTable() {
               </Button>
             </MDBox>
 
-            {/* Calendário + Tabela */}
-            <MDBox display="flex" gap={4} flexWrap="wrap" justifyContent="flex-start">
+            {/* Layout Responsivo */}
+            <MDBox
+              display="flex"
+              justifyContent="flex-start"
+              alignItems="flex-start"
+              gap={3}
+              sx={{
+                flexDirection: { xs: "column", md: "row" },
+                flexWrap: { xs: "wrap", md: "nowrap" },
+              }}
+            >
+              {/* Calendário */}
               <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <StaticDatePicker
                   displayStaticWrapperAs="desktop"
@@ -287,19 +267,18 @@ function AppointmentsTable() {
                   onChange={(newDate) => setSelectedDate(newDate)}
                   onMonthChange={(newMonth) => setSelectedDate(newMonth)}
                   sx={{
+                    flexShrink: 0,
+                    flexBasis: { xs: "100%", md: "360px" },
                     "& .MuiPickersDay-root": { fontSize: "0.9rem" },
                     "& .MuiDayCalendar-weekDayLabel": { fontWeight: 600 },
                   }}
                   renderDay={(day, _value, DayComponentProps) => {
-                    // ✅ Corrigido: converte UTC → fuso local antes da comparação
                     const appointment = appointments.find((a) => {
                       const appointmentLocal = dayjs(a.dateTime).tz(dayjs.tz.guess());
                       return appointmentLocal.isSame(day, "day");
                     });
-
                     const isPast = day.isBefore(dayjs(), "day");
                     const isOutsideMonth = day.month() !== selectedDate.month();
-
                     return (
                       <div style={{ position: "relative" }}>
                         <PickersDay {...DayComponentProps} />
@@ -323,79 +302,104 @@ function AppointmentsTable() {
                 />
               </LocalizationProvider>
 
-              <MDBox flex={1}>
-                <DataTable
-                  table={{
-                    columns: [
-                      { Header: "Cliente", accessor: "client" },
-                      { Header: "Título", accessor: "title" },
-                      { Header: "Descrição", accessor: "description" },
-                      { Header: "Data/Horário", accessor: "dateTime" },
-                      { Header: "Status", accessor: "status" },
-                      { Header: "Ações", accessor: "actions", align: "center" },
-                    ],
-                    rows: filteredAppointments.map((a) => ({
-                      client: a.client?.name,
-                      title: a.title,
-                      description: a.description,
-                      dateTime: new Date(a.dateTime).toLocaleString("pt-BR", {
-                        dateStyle: "short",
-                        timeStyle: "short",
-                      }),
-                      status: formatStatus(a.status),
-                      actions: (
-                        <>
-                          <Tooltip title="Editar">
-                            <IconButton
-                              color="primary"
-                              size="small"
-                              onClick={() => handleEditOpen(a)}
-                            >
-                              <i className="material-icons">edit</i>
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Cancelar">
-                            <IconButton
-                              color="error"
-                              size="small"
-                              onClick={() => handleCancel(a.id)}
-                            >
-                              <i className="material-icons">close</i>
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Concluir">
-                            <IconButton
-                              color="success"
-                              size="small"
-                              onClick={() => handleDone(a.id)}
-                            >
-                              <i className="material-icons">check</i>
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Não Compareceu">
-                            <IconButton
-                              color="warning"
-                              size="small"
-                              onClick={() => handleNoShow(a.id)}
-                            >
-                              <i className="material-icons">block</i>
-                            </IconButton>
-                          </Tooltip>
-                        </>
-                      ),
-                    })),
-                  }}
-                  isSorted={false}
-                  entriesPerPage={false}
-                  showTotalEntries={false}
-                  noEndBorder
-                />
+              {/* Tabela */}
+              <MDBox
+                flexGrow={1}
+                sx={{
+                  width: "100%",
+                  overflowX: "auto",
+                  overflowY: "hidden",
+                  maxWidth: "100%",
+                  "& table": { minWidth: "700px" },
+                }}
+              >
+                {filteredAppointments.length === 0 ? (
+                  <MDBox
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="center"
+                    height="100%"
+                    minHeight="200px"
+                    sx={{ color: "#9e9e9e", fontStyle: "italic" }}
+                  >
+                    Nenhum agendamento neste dia
+                  </MDBox>
+                ) : (
+                  <MDBox sx={{ overflowX: "auto" }}>
+                    <DataTable
+                      table={{
+                        columns: [
+                          { Header: "Cliente", accessor: "client" },
+                          { Header: "Título", accessor: "title" },
+                          { Header: "Descrição", accessor: "description" },
+                          { Header: "Data/Horário", accessor: "dateTime" },
+                          { Header: "Status", accessor: "status" },
+                          { Header: "Ações", accessor: "actions", align: "center" },
+                        ],
+                        rows: filteredAppointments.map((a) => ({
+                          client: a.client?.name,
+                          title: a.title,
+                          description: a.description,
+                          dateTime: new Date(a.dateTime).toLocaleString("pt-BR", {
+                            dateStyle: "short",
+                            timeStyle: "short",
+                          }),
+                          status: formatStatus(a.status),
+                          actions: (
+                            <MDBox display="flex" justifyContent="center" gap={0.5}>
+                              <Tooltip title="Editar">
+                                <IconButton
+                                  color="primary"
+                                  size="small"
+                                  onClick={() => handleEditOpen(a)}
+                                >
+                                  <i className="material-icons">edit</i>
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Cancelar">
+                                <IconButton
+                                  color="error"
+                                  size="small"
+                                  onClick={() => handleCancel(a.id)}
+                                >
+                                  <i className="material-icons">close</i>
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Concluir">
+                                <IconButton
+                                  color="success"
+                                  size="small"
+                                  onClick={() => handleDone(a.id)}
+                                >
+                                  <i className="material-icons">check</i>
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Não Compareceu">
+                                <IconButton
+                                  color="warning"
+                                  size="small"
+                                  onClick={() => handleNoShow(a.id)}
+                                >
+                                  <i className="material-icons">block</i>
+                                </IconButton>
+                              </Tooltip>
+                            </MDBox>
+                          ),
+                        })),
+                      }}
+                      isSorted={false}
+                      entriesPerPage={false}
+                      showTotalEntries={false}
+                      noEndBorder
+                    />
+                  </MDBox>
+                )}
               </MDBox>
             </MDBox>
           </CardContent>
         </Card>
 
-        {/* Modal (criar/editar) */}
+        {/* Modal */}
         <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
           <DialogTitle>{editingId ? "Editar Agendamento" : "Novo Agendamento"}</DialogTitle>
           <DialogContent>
