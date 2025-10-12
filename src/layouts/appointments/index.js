@@ -9,7 +9,6 @@ import {
 } from "services/appointments";
 import { getClients } from "services/clients";
 
-// MUI Components
 import DataTable from "examples/Tables/DataTable";
 import IconButton from "@mui/material/IconButton";
 import Tooltip from "@mui/material/Tooltip";
@@ -24,6 +23,8 @@ import MenuItem from "@mui/material/MenuItem";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Typography from "@mui/material/Typography";
+import CircularProgress from "@mui/material/CircularProgress";
+import Chip from "@mui/material/Chip";
 import { StaticDatePicker, LocalizationProvider, PickersDay } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs from "dayjs";
@@ -36,19 +37,25 @@ import { translateError } from "utils/errorTranslator";
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-// Função auxiliar de status
-const formatStatus = (status) => {
-  switch (status) {
+// ===== Helper para Status =====
+const getStatusChip = (status) => {
+  const normalized = typeof status === "string" ? status.toUpperCase() : status;
+
+  switch (normalized) {
     case 0:
-      return "Agendado";
+    case "SCHEDULED":
+      return <Chip label="Agendado" sx={{ backgroundColor: "#1A73E8", color: "#fff" }} />;
     case 1:
-      return "Cancelado";
+    case "CANCELED":
+      return <Chip label="Cancelado" sx={{ backgroundColor: "#E53935", color: "#fff" }} />;
     case 2:
-      return "Concluído";
+    case "DONE":
+      return <Chip label="Concluído" sx={{ backgroundColor: "#43A047", color: "#fff" }} />;
     case 3:
-      return "Não Compareceu";
+    case "NO_SHOW":
+      return <Chip label="Não Compareceu" sx={{ backgroundColor: "#9E9E9E", color: "#fff" }} />;
     default:
-      return status;
+      return <Chip label="Desconhecido" sx={{ backgroundColor: "#BDBDBD", color: "#fff" }} />;
   }
 };
 
@@ -67,12 +74,10 @@ function AppointmentsTable() {
   });
   const [fieldErrors, setFieldErrors] = useState({});
 
-  // Herda tema global e personaliza seleção do calendário
   const baseTheme = useTheme();
   const theme = createTheme({
     ...baseTheme,
     components: {
-      ...baseTheme.components,
       MuiPickersDay: {
         styleOverrides: {
           root: {
@@ -217,7 +222,6 @@ function AppointmentsTable() {
     }
   };
 
-  // Filtro por data
   const filteredAppointments = appointments.filter((a) =>
     dayjs(a.dateTime).isSame(selectedDate, "day")
   );
@@ -228,15 +232,18 @@ function AppointmentsTable() {
       <MDBox pt={3} pb={3} px={2} ml={{ xs: 0, lg: 30 }}>
         <Card sx={{ borderRadius: 3, boxShadow: 3, p: 2 }}>
           <CardContent>
-            {/* Header */}
             <MDBox display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-              <Typography variant="h5" fontWeight="bold" color="text.primary">
+              <Typography variant="h5" fontWeight="bold">
                 Agendamentos
               </Typography>
               <Button
                 variant="contained"
-                color="primary"
-                sx={{ height: "40px", color: "#fff" }}
+                sx={{
+                  height: "40px",
+                  color: "#fff",
+                  backgroundColor: "#1A73E8",
+                  "&:hover": { backgroundColor: "#1669c1" },
+                }}
                 onClick={() => {
                   setEditingId(null);
                   setFormData({ title: "", description: "", dateTime: "", clientId: "" });
@@ -248,84 +255,69 @@ function AppointmentsTable() {
               </Button>
             </MDBox>
 
-            {/* Layout Responsivo */}
-            <MDBox
-              display="flex"
-              justifyContent="flex-start"
-              alignItems="flex-start"
-              gap={3}
-              sx={{
-                flexDirection: { xs: "column", md: "row" },
-                flexWrap: { xs: "wrap", md: "nowrap" },
-              }}
-            >
-              {/* Calendário */}
-              <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <StaticDatePicker
-                  displayStaticWrapperAs="desktop"
-                  value={selectedDate}
-                  onChange={(newDate) => setSelectedDate(newDate)}
-                  onMonthChange={(newMonth) => setSelectedDate(newMonth)}
-                  sx={{
-                    flexShrink: 0,
-                    flexBasis: { xs: "100%", md: "360px" },
-                    "& .MuiPickersDay-root": { fontSize: "0.9rem" },
-                    "& .MuiDayCalendar-weekDayLabel": { fontWeight: 600 },
-                  }}
-                  renderDay={(day, _value, DayComponentProps) => {
-                    const appointment = appointments.find((a) => {
-                      const appointmentLocal = dayjs(a.dateTime).tz(dayjs.tz.guess());
-                      return appointmentLocal.isSame(day, "day");
-                    });
-                    const isPast = day.isBefore(dayjs(), "day");
-                    const isOutsideMonth = day.month() !== selectedDate.month();
-                    return (
-                      <div style={{ position: "relative" }}>
-                        <PickersDay {...DayComponentProps} />
-                        {appointment && !isOutsideMonth && (
-                          <span
-                            style={{
-                              width: 6,
-                              height: 6,
-                              borderRadius: "50%",
-                              backgroundColor: isPast ? "#b0b0b0" : "#1A73E8",
-                              position: "absolute",
-                              bottom: 4,
-                              left: "50%",
-                              transform: "translateX(-50%)",
-                            }}
-                          />
-                        )}
-                      </div>
-                    );
-                  }}
-                />
-              </LocalizationProvider>
-
-              {/* Tabela */}
+            {loading ? (
+              <MDBox display="flex" justifyContent="center" alignItems="center" minHeight="300px">
+                <CircularProgress color="primary" />
+              </MDBox>
+            ) : (
               <MDBox
-                flexGrow={1}
+                display="flex"
+                justifyContent="flex-start"
+                alignItems="flex-start"
+                gap={3}
                 sx={{
-                  width: "100%",
-                  overflowX: "auto",
-                  overflowY: "hidden",
-                  maxWidth: "100%",
-                  "& table": { minWidth: "700px" },
+                  flexDirection: { xs: "column", md: "row" },
+                  flexWrap: { xs: "wrap", md: "nowrap" },
                 }}
               >
-                {filteredAppointments.length === 0 ? (
-                  <MDBox
-                    display="flex"
-                    alignItems="center"
-                    justifyContent="center"
-                    height="100%"
-                    minHeight="200px"
-                    sx={{ color: "#9e9e9e", fontStyle: "italic" }}
-                  >
-                    Nenhum agendamento neste dia
-                  </MDBox>
-                ) : (
-                  <MDBox sx={{ overflowX: "auto" }}>
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                  <StaticDatePicker
+                    displayStaticWrapperAs="desktop"
+                    value={selectedDate}
+                    onChange={(newDate) => setSelectedDate(newDate)}
+                    sx={{ flexShrink: 0, flexBasis: { xs: "100%", md: "360px" } }}
+                    renderDay={(day, _value, DayComponentProps) => {
+                      const appointment = appointments.find((a) =>
+                        dayjs(a.dateTime).isSame(day, "day")
+                      );
+                      const isPast = day.isBefore(dayjs(), "day");
+                      const isOutsideMonth = day.month() !== selectedDate.month();
+                      return (
+                        <div style={{ position: "relative" }}>
+                          <PickersDay {...DayComponentProps} />
+                          {appointment && !isOutsideMonth && (
+                            <span
+                              style={{
+                                width: 6,
+                                height: 6,
+                                borderRadius: "50%",
+                                backgroundColor: isPast ? "#b0b0b0" : "#1A73E8",
+                                position: "absolute",
+                                bottom: 4,
+                                left: "50%",
+                                transform: "translateX(-50%)",
+                              }}
+                            />
+                          )}
+                        </div>
+                      );
+                    }}
+                  />
+                </LocalizationProvider>
+
+                <MDBox flexGrow={1} sx={{ width: "100%", overflowX: "auto" }}>
+                  {filteredAppointments.length === 0 ? (
+                    <MDBox
+                      display="flex"
+                      alignItems="center"
+                      justifyContent="center"
+                      height="100%"
+                      minHeight="200px"
+                      sx={{ color: "#9e9e9e", fontStyle: "italic" }}
+                    >
+                      Nenhum agendamento neste dia
+                    </MDBox>
+                  ) : (
                     <DataTable
                       table={{
                         columns: [
@@ -344,42 +336,26 @@ function AppointmentsTable() {
                             dateStyle: "short",
                             timeStyle: "short",
                           }),
-                          status: formatStatus(a.status),
+                          status: getStatusChip(a.status),
                           actions: (
                             <MDBox display="flex" justifyContent="center" gap={0.5}>
                               <Tooltip title="Editar">
-                                <IconButton
-                                  color="primary"
-                                  size="small"
-                                  onClick={() => handleEditOpen(a)}
-                                >
+                                <IconButton color="primary" size="small" onClick={() => handleEditOpen(a)}>
                                   <i className="material-icons">edit</i>
                                 </IconButton>
                               </Tooltip>
                               <Tooltip title="Cancelar">
-                                <IconButton
-                                  color="error"
-                                  size="small"
-                                  onClick={() => handleCancel(a.id)}
-                                >
+                                <IconButton color="error" size="small" onClick={() => handleCancel(a.id)}>
                                   <i className="material-icons">close</i>
                                 </IconButton>
                               </Tooltip>
                               <Tooltip title="Concluir">
-                                <IconButton
-                                  color="success"
-                                  size="small"
-                                  onClick={() => handleDone(a.id)}
-                                >
+                                <IconButton color="success" size="small" onClick={() => handleDone(a.id)}>
                                   <i className="material-icons">check</i>
                                 </IconButton>
                               </Tooltip>
                               <Tooltip title="Não Compareceu">
-                                <IconButton
-                                  color="warning"
-                                  size="small"
-                                  onClick={() => handleNoShow(a.id)}
-                                >
+                                <IconButton color="warning" size="small" onClick={() => handleNoShow(a.id)}>
                                   <i className="material-icons">block</i>
                                 </IconButton>
                               </Tooltip>
@@ -392,87 +368,12 @@ function AppointmentsTable() {
                       showTotalEntries={false}
                       noEndBorder
                     />
-                  </MDBox>
-                )}
+                  )}
+                </MDBox>
               </MDBox>
-            </MDBox>
+            )}
           </CardContent>
         </Card>
-
-        {/* Modal */}
-        <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
-          <DialogTitle>{editingId ? "Editar Agendamento" : "Novo Agendamento"}</DialogTitle>
-          <DialogContent>
-            <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Título"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  error={!!fieldErrors.title}
-                  helperText={fieldErrors.title}
-                  disabled={!!editingId}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Descrição"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  error={!!fieldErrors.description}
-                  helperText={fieldErrors.description}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  type="datetime-local"
-                  label="Data/Horário"
-                  InputLabelProps={{ shrink: true }}
-                  value={formData.dateTime}
-                  onChange={(e) => setFormData({ ...formData, dateTime: e.target.value })}
-                  error={!!fieldErrors.dateTime}
-                  helperText={fieldErrors.dateTime}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  select
-                  fullWidth
-                  label="Cliente"
-                  value={formData.clientId}
-                  onChange={(e) =>
-                    setFormData({ ...formData, clientId: String(e.target.value) })
-                  }
-                  error={!!fieldErrors.clientId}
-                  helperText={fieldErrors.clientId}
-                  InputLabelProps={{ shrink: true }}
-                  disabled={!!editingId}
-                >
-                  {clients.map((c) => (
-                    <MenuItem key={c.id} value={String(c.id)}>
-                      {c.name}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
-            </Grid>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setOpen(false)}>Cancelar</Button>
-            {editingId ? (
-              <Button onClick={handleUpdate} variant="contained" color="primary">
-                Atualizar
-              </Button>
-            ) : (
-              <Button onClick={handleCreate} variant="contained" color="primary">
-                Salvar
-              </Button>
-            )}
-          </DialogActions>
-        </Dialog>
       </MDBox>
     </ThemeProvider>
   );
