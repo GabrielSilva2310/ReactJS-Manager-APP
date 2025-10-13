@@ -238,11 +238,14 @@ function AppointmentsTable() {
               </Typography>
               <Button
                 variant="contained"
+                color="primary"
+                disableElevation
                 sx={{
                   height: "40px",
                   color: "#fff",
                   backgroundColor: "#1A73E8",
                   "&:hover": { backgroundColor: "#1669c1" },
+                  cursor: "pointer",
                 }}
                 onClick={() => {
                   setEditingId(null);
@@ -374,6 +377,79 @@ function AppointmentsTable() {
             )}
           </CardContent>
         </Card>
+
+        {/* Modal */}
+        <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
+          <DialogTitle>{editingId ? "Editar Agendamento" : "Novo Agendamento"}</DialogTitle>
+          <DialogContent>
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Título"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  error={!!fieldErrors.title}
+                  helperText={fieldErrors.title}
+                  disabled={!!editingId}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Descrição"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  error={!!fieldErrors.description}
+                  helperText={fieldErrors.description}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  type="datetime-local"
+                  label="Data/Horário"
+                  InputLabelProps={{ shrink: true }}
+                  value={formData.dateTime}
+                  onChange={(e) => setFormData({ ...formData, dateTime: e.target.value })}
+                  error={!!fieldErrors.dateTime}
+                  helperText={fieldErrors.dateTime}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  select
+                  fullWidth
+                  label="Cliente"
+                  value={formData.clientId}
+                  onChange={(e) => setFormData({ ...formData, clientId: String(e.target.value) })}
+                  error={!!fieldErrors.clientId}
+                  helperText={fieldErrors.clientId}
+                  InputLabelProps={{ shrink: true }}
+                  disabled={!!editingId}
+                >
+                  {clients.map((c) => (
+                    <MenuItem key={c.id} value={String(c.id)}>
+                      {c.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setOpen(false)}>Cancelar</Button>
+            {editingId ? (
+              <Button onClick={handleUpdate} variant="contained" color="primary">
+                Atualizar
+              </Button>
+            ) : (
+              <Button onClick={handleCreate} variant="contained" color="primary">
+                Salvar
+              </Button>
+            )}
+          </DialogActions>
+        </Dialog>
       </MDBox>
     </ThemeProvider>
   );
