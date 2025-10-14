@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   getAppointments,
   cancelAppointment,
@@ -25,6 +25,8 @@ import CardContent from "@mui/material/CardContent";
 import Typography from "@mui/material/Typography";
 import CircularProgress from "@mui/material/CircularProgress";
 import Chip from "@mui/material/Chip";
+import Snackbar from "@mui/material/Snackbar";
+import MuiAlert from "@mui/material/Alert";
 import { StaticDatePicker, LocalizationProvider, PickersDay } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs from "dayjs";
@@ -33,9 +35,16 @@ import timezone from "dayjs/plugin/timezone";
 import { ThemeProvider, createTheme, useTheme } from "@mui/material/styles";
 import MDBox from "components/MDBox";
 import { translateError } from "utils/errorTranslator";
+import Slide from "@mui/material/Slide";
+
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
+
+// ===== Helper Snackbar =====
+const Alert = React.forwardRef(function Alert(props, ref) {
+  return <MuiAlert elevation={6} ref={ref} variant="filled" {...props} />;
+});
 
 // ===== Helper para Status =====
 const getStatusChip = (status) => {
@@ -74,6 +83,28 @@ function AppointmentsTable() {
   });
   const [fieldErrors, setFieldErrors] = useState({});
 
+  // Snackbar
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+  const showSnackbar = (message, severity = "success") => {
+    setSnackbar({ open: true, message, severity });
+  };
+  const handleCloseSnackbar = () => setSnackbar({ ...snackbar, open: false });
+
+  // Confirm Dialog
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: "",
+    message: "",
+    onConfirm: null,
+  });
+
+  const openConfirmDialog = (title, message, onConfirm) => {
+    setConfirmDialog({ open: true, title, message, onConfirm });
+  };
+  const handleConfirmClose = () => {
+    setConfirmDialog({ ...confirmDialog, open: false });
+  };
+
   const baseTheme = useTheme();
   const theme = createTheme({
     ...baseTheme,
@@ -109,7 +140,7 @@ function AppointmentsTable() {
       const data = await getClients();
       setClients(data);
     } catch {
-      console.error("Erro ao carregar clientes");
+      showSnackbar("Erro ao carregar clientes", "error");
     }
   };
 
@@ -119,40 +150,43 @@ function AppointmentsTable() {
   }, []);
 
   // ===== ACTIONS =====
-  const handleCancel = async (id) => {
-    if (window.confirm("Tem certeza que deseja cancelar este agendamento?")) {
+  const handleCancel = (id) => {
+    openConfirmDialog("Cancelar Agendamento", "Tem certeza que deseja cancelar este agendamento?", async () => {
       try {
         await cancelAppointment(id);
         await loadAppointments();
+        showSnackbar("Agendamento cancelado!");
       } catch (err) {
         const msg = err.response?.data?.message || err.response?.data?.error || "Erro inesperado";
-        alert(translateError(msg));
+        showSnackbar(translateError(msg), "error");
       }
-    }
+    });
   };
 
-  const handleDone = async (id) => {
-    if (window.confirm("Marcar este agendamento como concluído?")) {
+  const handleDone = (id) => {
+    openConfirmDialog("Concluir Agendamento", "Marcar este agendamento como concluído?", async () => {
       try {
         await doneAppointment(id);
         await loadAppointments();
+        showSnackbar("Agendamento concluído!");
       } catch (err) {
         const msg = err.response?.data?.message || err.response?.data?.error || "Erro inesperado";
-        alert(translateError(msg));
+        showSnackbar(translateError(msg), "error");
       }
-    }
+    });
   };
 
-  const handleNoShow = async (id) => {
-    if (window.confirm("Marcar este agendamento como 'Não compareceu'?")) {
+  const handleNoShow = (id) => {
+    openConfirmDialog("Não Compareceu", "Marcar este agendamento como 'Não compareceu'?", async () => {
       try {
         await noShowAppointment(id);
         await loadAppointments();
+        showSnackbar("Marcado como 'Não Compareceu'.");
       } catch (err) {
         const msg = err.response?.data?.message || err.response?.data?.error || "Erro inesperado";
-        alert(translateError(msg));
+        showSnackbar(translateError(msg), "error");
       }
-    }
+    });
   };
 
   const handleCreate = async () => {
@@ -163,10 +197,14 @@ function AppointmentsTable() {
         dateTime: new Date(formData.dateTime).toISOString(),
       };
       await createAppointment(payload);
+
+      setSelectedDate(dayjs(formData.dateTime));
+
       setOpen(false);
       setFormData({ title: "", description: "", dateTime: "", clientId: "" });
       setFieldErrors({});
       await loadAppointments();
+      showSnackbar("Agendamento criado com sucesso!");
     } catch (err) {
       const data = err.response?.data;
       if (data?.errors && Array.isArray(data.errors)) {
@@ -177,7 +215,7 @@ function AppointmentsTable() {
         setFieldErrors(newErrors);
       } else {
         const msg = data?.message || data?.error || "Erro inesperado";
-        alert(translateError(msg));
+        showSnackbar(translateError(msg), "error");
       }
     }
   };
@@ -207,6 +245,7 @@ function AppointmentsTable() {
       setFormData({ title: "", description: "", dateTime: "", clientId: "" });
       setFieldErrors({});
       await loadAppointments();
+      showSnackbar("Agendamento atualizado com sucesso!");
     } catch (err) {
       const data = err.response?.data;
       if (data?.errors && Array.isArray(data.errors)) {
@@ -217,10 +256,15 @@ function AppointmentsTable() {
         setFieldErrors(newErrors);
       } else {
         const msg = data?.message || data?.error || "Erro inesperado";
-        alert(translateError(msg));
+        showSnackbar(translateError(msg), "error");
       }
     }
   };
+
+
+  function TransitionUp(props) {
+  return <Slide {...props} direction="up" />;
+  }
 
   const filteredAppointments = appointments.filter((a) =>
     dayjs(a.dateTime).isSame(selectedDate, "day")
@@ -378,7 +422,7 @@ function AppointmentsTable() {
           </CardContent>
         </Card>
 
-        {/* Modal */}
+        {/* Modal Criar/Editar */}
         <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
           <DialogTitle>{editingId ? "Editar Agendamento" : "Novo Agendamento"}</DialogTitle>
           <DialogContent>
@@ -450,6 +494,40 @@ function AppointmentsTable() {
             )}
           </DialogActions>
         </Dialog>
+
+        {/* Dialog de Confirmação */}
+        <Dialog open={confirmDialog.open} onClose={handleConfirmClose}>
+          <DialogTitle>{confirmDialog.title}</DialogTitle>
+          <DialogContent>
+            <Typography>{confirmDialog.message}</Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleConfirmClose}>Não</Button>
+            <Button
+              onClick={() => {
+                confirmDialog.onConfirm?.();
+                handleConfirmClose();
+              }}
+              color="primary"
+              variant="contained"
+            >
+              Sim
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Snackbar */}
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={4000}
+          onClose={handleCloseSnackbar}
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+          TransitionComponent={TransitionUp}
+        >
+          <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: "100%" }}>
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
       </MDBox>
     </ThemeProvider>
   );
