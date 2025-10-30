@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState, useRef } from "react";
 import {
   getAppointments,
   cancelAppointment,
@@ -82,6 +82,8 @@ function AppointmentsTable() {
     clientId: "",
   });
   const [fieldErrors, setFieldErrors] = useState({});
+const updatingRef = useRef(false);
+const lastDateRef = useRef(null);
 
   // Snackbar
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
@@ -196,14 +198,23 @@ function AppointmentsTable() {
         clientId: Number(formData.clientId),
         dateTime: new Date(formData.dateTime).toISOString(),
       };
-      await createAppointment(payload);
+     
+    await createAppointment(payload);
+    await loadAppointments();
 
-      setSelectedDate(dayjs(formData.dateTime));
+    updatingRef.current = true;
+const newDate = dayjs(formData.dateTime).startOf("day");
+setSelectedDate(newDate);
+lastDateRef.current = newDate; // mantém coerência
 
+setTimeout(() => {
+  updatingRef.current = false;
+}, 300);
+
+ 
       setOpen(false);
       setFormData({ title: "", description: "", dateTime: "", clientId: "" });
       setFieldErrors({});
-      await loadAppointments();
       showSnackbar("Agendamento criado com sucesso!");
     } catch (err) {
       const data = err.response?.data;
@@ -270,6 +281,37 @@ function AppointmentsTable() {
     dayjs(a.dateTime).isSame(selectedDate, "day")
   );
 
+  const renderDay = useCallback(
+  (day, _value, DayComponentProps) => {
+    const appointment = appointments.find((a) =>
+      dayjs(a.dateTime).isSame(day, "day")
+    );
+    const isPast = day.isBefore(dayjs(), "day");
+    const isOutsideMonth = day.month() !== selectedDate.month();
+
+    return (
+      <div style={{ position: "relative" }}>
+        <PickersDay {...DayComponentProps} />
+        {appointment && !isOutsideMonth && (
+          <span
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: "50%",
+              backgroundColor: isPast ? "#b0b0b0" : "#1A73E8",
+              position: "absolute",
+              bottom: 4,
+              left: "50%",
+              transform: "translateX(-50%)",
+            }}
+          />
+        )}
+      </div>
+    );
+  },
+  [appointments, selectedDate]
+);
+
   // ===== RENDER =====
   return (
     <ThemeProvider theme={theme}>
@@ -318,38 +360,32 @@ function AppointmentsTable() {
                 }}
               >
                 <LocalizationProvider dateAdapter={AdapterDayjs}>
-                  <StaticDatePicker
-                    displayStaticWrapperAs="desktop"
-                    value={selectedDate}
-                    onChange={(newDate) => setSelectedDate(newDate)}
-                    sx={{ flexShrink: 0, flexBasis: { xs: "100%", md: "360px" } }}
-                    renderDay={(day, _value, DayComponentProps) => {
-                      const appointment = appointments.find((a) =>
-                        dayjs(a.dateTime).isSame(day, "day")
-                      );
-                      const isPast = day.isBefore(dayjs(), "day");
-                      const isOutsideMonth = day.month() !== selectedDate.month();
-                      return (
-                        <div style={{ position: "relative" }}>
-                          <PickersDay {...DayComponentProps} />
-                          {appointment && !isOutsideMonth && (
-                            <span
-                              style={{
-                                width: 6,
-                                height: 6,
-                                borderRadius: "50%",
-                                backgroundColor: isPast ? "#b0b0b0" : "#1A73E8",
-                                position: "absolute",
-                                bottom: 4,
-                                left: "50%",
-                                transform: "translateX(-50%)",
-                              }}
-                            />
-                          )}
-                        </div>
-                      );
-                    }}
-                  />
+                <StaticDatePicker
+  displayStaticWrapperAs="desktop"
+  value={selectedDate}
+  onChange={(newDate) => {
+     if (!newDate) return;
+
+    // se atualização automática, ignora
+    if (updatingRef.current) return;
+
+    const normalized = dayjs(newDate).startOf("day");
+    const current = dayjs(selectedDate).startOf("day");
+
+    // Evita loop se mesmo timestamp
+    if (lastDateRef.current && lastDateRef.current.valueOf() === normalized.valueOf()) {
+      return;
+    }
+
+    lastDateRef.current = normalized;
+
+    if (!normalized.isSame(current, "day")) {
+      setSelectedDate(normalized);
+    }
+  }}
+  renderDay={renderDay}
+/>
+
                 </LocalizationProvider>
 
                 <MDBox flexGrow={1} sx={{ width: "100%", overflowX: "auto" }}>
@@ -526,7 +562,7 @@ function AppointmentsTable() {
         >
           <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: "100%" }}>
             {snackbar.message}
-          </Alert>
+          </Alert> 
         </Snackbar>
       </MDBox>
     </ThemeProvider>
