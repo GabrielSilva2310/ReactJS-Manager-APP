@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState, useRef } from "react";
+import React, { useCallback, useEffect, useState, useRef, useMemo } from "react";
+
 import {
   getAppointments,
   cancelAppointment,
@@ -27,7 +28,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Chip from "@mui/material/Chip";
 import Snackbar from "@mui/material/Snackbar";
 import MuiAlert from "@mui/material/Alert";
-import { StaticDatePicker, LocalizationProvider, PickersDay } from "@mui/x-date-pickers";
+import { DateCalendar, LocalizationProvider, PickersDay } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
@@ -69,6 +70,8 @@ const getStatusChip = (status) => {
 };
 
 function AppointmentsTable() {
+  let renderCount = 0;
+
   const [appointments, setAppointments] = useState([]);
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -277,22 +280,26 @@ setTimeout(() => {
   return <Slide {...props} direction="up" />;
   }
 
-  const filteredAppointments = appointments.filter((a) =>
+
+  const filteredAppointments = useMemo(() => {
+  return appointments.filter((a) =>
     dayjs(a.dateTime).isSame(selectedDate, "day")
   );
+}, [appointments, selectedDate]);
 
-  const renderDay = useCallback(
+const renderDay = useCallback(
   (day, _value, DayComponentProps) => {
-    const appointment = appointments.find((a) =>
+    const hasAppointment = appointments.some((a) =>
       dayjs(a.dateTime).isSame(day, "day")
     );
+
     const isPast = day.isBefore(dayjs(), "day");
     const isOutsideMonth = day.month() !== selectedDate.month();
 
     return (
       <div style={{ position: "relative" }}>
         <PickersDay {...DayComponentProps} />
-        {appointment && !isOutsideMonth && (
+        {hasAppointment && !isOutsideMonth && (
           <span
             style={{
               width: 6,
@@ -309,8 +316,68 @@ setTimeout(() => {
       </div>
     );
   },
-  [appointments, selectedDate]
+  [appointments] // ⬅️ remove o selectedDate daqui
 );
+
+// ===== Controle anti-loop do calendário =====
+const changingDateRef = useRef(false);
+
+useEffect(() => {
+  if (changingDateRef.current) {
+    const timeout = setTimeout(() => {
+      changingDateRef.current = false;
+    }, 150);
+    return () => clearTimeout(timeout);
+  }
+}, [selectedDate]);
+
+const columns = useMemo(() => [
+  { Header: "Cliente", accessor: "client" },
+  { Header: "Título", accessor: "title" },
+  { Header: "Descrição", accessor: "description" },
+  { Header: "Data/Horário", accessor: "dateTime" },
+  { Header: "Status", accessor: "status" },
+  { Header: "Ações", accessor: "actions", align: "center" },
+], []);
+
+const rows = useMemo(() => 
+  filteredAppointments.map((a) => ({
+    client: a.client?.name,
+    title: a.title,
+    description: a.description,
+    dateTime: new Date(a.dateTime).toLocaleString("pt-BR", {
+      dateStyle: "short",
+      timeStyle: "short",
+    }),
+    status: getStatusChip(a.status),
+    actions: (
+      <MDBox display="flex" justifyContent="center" gap={0.5}>
+        <Tooltip title="Editar">
+          <IconButton color="primary" size="small" onClick={() => handleEditOpen(a)}>
+            <i className="material-icons">edit</i>
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Cancelar">
+          <IconButton color="error" size="small" onClick={() => handleCancel(a.id)}>
+            <i className="material-icons">close</i>
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Concluir">
+          <IconButton color="success" size="small" onClick={() => handleDone(a.id)}>
+            <i className="material-icons">check</i>
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Não Compareceu">
+          <IconButton color="warning" size="small" onClick={() => handleNoShow(a.id)}>
+            <i className="material-icons">block</i>
+          </IconButton>
+        </Tooltip>
+      </MDBox>
+    ),
+  }))
+, [filteredAppointments]);
+
+const memoizedTable = useMemo(() => ({ columns, rows }), [columns, rows]);
 
   // ===== RENDER =====
   return (
@@ -360,99 +427,75 @@ setTimeout(() => {
                 }}
               >
                 <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <StaticDatePicker
-  displayStaticWrapperAs="desktop"
-  value={selectedDate}
-  onChange={(newDate) => {
-     if (!newDate) return;
+                  <DateCalendar
+    value={selectedDate}
+   onChange={(newDate) => {
+  if (!newDate) return;
 
-    // se atualização automática, ignora
-    if (updatingRef.current) return;
+  const normalized = dayjs(newDate).startOf("day");
+  const current = dayjs(selectedDate).startOf("day");
 
-    const normalized = dayjs(newDate).startOf("day");
-    const current = dayjs(selectedDate).startOf("day");
+  console.log("📅 onChange disparado:", newDate?.format?.("DD/MM/YYYY"));
+  console.trace("🔍 Stack trace do setSelectedDate:");
 
-    // Evita loop se mesmo timestamp
-    if (lastDateRef.current && lastDateRef.current.valueOf() === normalized.valueOf()) {
-      return;
-    }
+  // se for o mesmo dia, nem atualiza (corta o loop)
+  if (normalized.isSame(current, "day")) return;
 
-    lastDateRef.current = normalized;
+  // se o calendário já está atualizando internamente, ignora
+  if (updatingRef.current) return;
 
-    if (!normalized.isSame(current, "day")) {
-      setSelectedDate(normalized);
-    }
-  }}
-  renderDay={renderDay}
-/>
+  updatingRef.current = true;
+  setSelectedDate(normalized);
 
+  // libera flag só depois do próximo render
+  requestAnimationFrame(() => {
+    updatingRef.current = false;
+  });
+}}
+
+    slots={{
+      day: (dayProps) => renderDay(dayProps.day, dayProps.value, dayProps),
+    }}
+    sx={{
+      width: "100%",
+      maxWidth: 360,
+      "& .MuiPickersDay-root.Mui-selected": {
+        backgroundColor: "#1A73E8",
+        color: "#fff",
+        "&:hover": {
+          backgroundColor: "#1669c1",
+        },
+      },
+      "& .MuiPickersDay-today": {
+        borderColor: "#1A73E8",
+      },
+    }}
+  />
                 </LocalizationProvider>
 
-                <MDBox flexGrow={1} sx={{ width: "100%", overflowX: "auto" }}>
-                  {filteredAppointments.length === 0 ? (
-                    <MDBox
-                      display="flex"
-                      alignItems="center"
-                      justifyContent="center"
-                      height="100%"
-                      minHeight="200px"
-                      sx={{ color: "#9e9e9e", fontStyle: "italic" }}
-                    >
-                      Nenhum agendamento neste dia
-                    </MDBox>
-                  ) : (
-                    <DataTable
-                      table={{
-                        columns: [
-                          { Header: "Cliente", accessor: "client" },
-                          { Header: "Título", accessor: "title" },
-                          { Header: "Descrição", accessor: "description" },
-                          { Header: "Data/Horário", accessor: "dateTime" },
-                          { Header: "Status", accessor: "status" },
-                          { Header: "Ações", accessor: "actions", align: "center" },
-                        ],
-                        rows: filteredAppointments.map((a) => ({
-                          client: a.client?.name,
-                          title: a.title,
-                          description: a.description,
-                          dateTime: new Date(a.dateTime).toLocaleString("pt-BR", {
-                            dateStyle: "short",
-                            timeStyle: "short",
-                          }),
-                          status: getStatusChip(a.status),
-                          actions: (
-                            <MDBox display="flex" justifyContent="center" gap={0.5}>
-                              <Tooltip title="Editar">
-                                <IconButton color="primary" size="small" onClick={() => handleEditOpen(a)}>
-                                  <i className="material-icons">edit</i>
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title="Cancelar">
-                                <IconButton color="error" size="small" onClick={() => handleCancel(a.id)}>
-                                  <i className="material-icons">close</i>
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title="Concluir">
-                                <IconButton color="success" size="small" onClick={() => handleDone(a.id)}>
-                                  <i className="material-icons">check</i>
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title="Não Compareceu">
-                                <IconButton color="warning" size="small" onClick={() => handleNoShow(a.id)}>
-                                  <i className="material-icons">block</i>
-                                </IconButton>
-                              </Tooltip>
-                            </MDBox>
-                          ),
-                        })),
-                      }}
-                      isSorted={false}
-                      entriesPerPage={false}
-                      showTotalEntries={false}
-                      noEndBorder
-                    />
-                  )}
-                </MDBox>
+               <MDBox flexGrow={1} sx={{ width: "100%", overflowX: "auto" }}>
+  {filteredAppointments.length === 0 ? (
+    <MDBox
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      height="100%"
+      minHeight="200px"
+      sx={{ color: "#9e9e9e", fontStyle: "italic" }}
+    >
+      Nenhum agendamento neste dia
+    </MDBox>
+  ) : (
+    <DataTable
+      table={memoizedTable}
+      isSorted={false}
+      entriesPerPage={false}
+      showTotalEntries={false}
+      noEndBorder
+    />
+  )}
+</MDBox>
+
               </MDBox>
             )}
           </CardContent>
