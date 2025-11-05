@@ -37,6 +37,7 @@ import { ThemeProvider, createTheme, useTheme } from "@mui/material/styles";
 import MDBox from "components/MDBox";
 import { translateError } from "utils/errorTranslator";
 import Slide from "@mui/material/Slide";
+import { getAvailability } from "services/availability";
 
 
 dayjs.extend(utc);
@@ -88,6 +89,10 @@ function AppointmentsTable() {
 const updatingRef = useRef(false);
 const lastDateRef = useRef(null);
 
+const [availableSlots, setAvailableSlots] = useState([]);
+const [selectedTime, setSelectedTime] = useState("");
+const [loadingSlots, setLoadingSlots] = useState(false);
+
   // Snackbar
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const showSnackbar = (message, severity = "success") => {
@@ -129,6 +134,15 @@ const lastDateRef = useRef(null);
     },
   });
 
+  const handleCloseModal = () => {
+  setOpen(false);
+  setEditingId(null);
+  setFormData({ title: "", description: "", dateTime: "", clientId: "" });
+  setSelectedTime("");
+  setAvailableSlots([]);
+  setFieldErrors({});
+};
+
   // ===== LOAD DATA =====
   const loadAppointments = async () => {
     setLoading(true);
@@ -154,6 +168,38 @@ const lastDateRef = useRef(null);
     loadClients();
   }, []);
 
+  
+  useEffect(() => {
+  if (!(open && !editingId && selectedDate)) return;
+
+  let cancelled = false; // ✅ flag de cancelamento
+
+  const loadSlots = async () => {
+    try {
+      setLoadingSlots(true);
+      const formattedDate = dayjs(selectedDate).format("YYYY-MM-DD");
+      const slots = await getAvailability(2, formattedDate); // 👈 ainda hardcoded
+      if (!cancelled) { // ✅ evita atualizar se o modal foi fechado
+        setAvailableSlots(slots);
+        setSelectedTime("");
+      }
+    } catch (err) {
+      if (!cancelled) {
+        showSnackbar("Erro ao carregar horários disponíveis", "error");
+      }
+    } finally {
+      if (!cancelled) setLoadingSlots(false);
+    }
+  };
+
+  loadSlots();
+
+  // ✅ cleanup executado quando o modal é fechado
+  return () => {
+    cancelled = true;
+  };
+}, [open, selectedDate, editingId]);
+ 
   // ===== ACTIONS =====
   const handleCancel = (id) => {
     openConfirmDialog("Cancelar Agendamento", "Tem certeza que deseja cancelar este agendamento?", async () => {
@@ -194,45 +240,56 @@ const lastDateRef = useRef(null);
     });
   };
 
-  const handleCreate = async () => {
-    try {
-      const payload = {
-        ...formData,
-        clientId: Number(formData.clientId),
-        dateTime: new Date(formData.dateTime).toISOString(),
-      };
-     
+   const handleCreate = async () => {
+  try {
+    if (!selectedTime) {
+      showSnackbar("Selecione um horário disponível!", "warning");
+      return;
+    }
+
+    const fullDateTime = dayjs(selectedDate)
+      .hour(selectedTime.split(":")[0])
+      .minute(selectedTime.split(":")[1])
+      .second(0)
+      .millisecond(0)
+      .toISOString();
+
+    const payload = {
+      ...formData,
+      clientId: Number(formData.clientId),
+      dateTime: fullDateTime,
+    };
+
     await createAppointment(payload);
     await loadAppointments();
 
     updatingRef.current = true;
-const newDate = dayjs(formData.dateTime).startOf("day");
-setSelectedDate(newDate);
-lastDateRef.current = newDate; // mantém coerência
+    const newDate = dayjs(fullDateTime).startOf("day");
+    setSelectedDate(newDate);
+    lastDateRef.current = newDate;
+    setTimeout(() => (updatingRef.current = false), 300);
 
-setTimeout(() => {
-  updatingRef.current = false;
-}, 300);
-
- 
-      setOpen(false);
-      setFormData({ title: "", description: "", dateTime: "", clientId: "" });
-      setFieldErrors({});
-      showSnackbar("Agendamento criado com sucesso!");
-    } catch (err) {
-      const data = err.response?.data;
-      if (data?.errors && Array.isArray(data.errors)) {
-        const newErrors = {};
-        data.errors.forEach((e) => {
-          if (e.fieldName && e.message) newErrors[e.fieldName] = translateError(e.message);
-        });
-        setFieldErrors(newErrors);
-      } else {
-        const msg = data?.message || data?.error || "Erro inesperado";
-        showSnackbar(translateError(msg), "error");
-      }
+    setOpen(false);
+    setFormData({ title: "", description: "", dateTime: "", clientId: "" });
+    setSelectedTime("");
+    setAvailableSlots([]);
+    setFieldErrors({});
+    showSnackbar("Agendamento criado com sucesso!");
+  } catch (err) {
+    const data = err.response?.data;
+    if (data?.errors && Array.isArray(data.errors)) {
+      const newErrors = {};
+      data.errors.forEach((e) => {
+        if (e.fieldName && e.message)
+          newErrors[e.fieldName] = translateError(e.message);
+      });
+      setFieldErrors(newErrors);
+    } else {
+      const msg = data?.message || data?.error || "Erro inesperado";
+      showSnackbar(translateError(msg), "error");
     }
-  };
+  }
+};
 
   const handleEditOpen = (appointment) => {
     document.activeElement.blur();
@@ -500,79 +557,187 @@ const memoizedTable = useMemo(() => ({ columns, rows }), [columns, rows]);
             )}
           </CardContent>
         </Card>
-
+        
         {/* Modal Criar/Editar */}
-        <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
-          <DialogTitle>{editingId ? "Editar Agendamento" : "Novo Agendamento"}</DialogTitle>
-          <DialogContent>
-            <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Título"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  error={!!fieldErrors.title}
-                  helperText={fieldErrors.title}
-                  disabled={!!editingId}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Descrição"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  error={!!fieldErrors.description}
-                  helperText={fieldErrors.description}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  type="datetime-local"
-                  label="Data/Horário"
-                  InputLabelProps={{ shrink: true }}
-                  value={formData.dateTime}
-                  onChange={(e) => setFormData({ ...formData, dateTime: e.target.value })}
-                  error={!!fieldErrors.dateTime}
-                  helperText={fieldErrors.dateTime}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  select
-                  fullWidth
-                  label="Cliente"
-                  value={formData.clientId}
-                  onChange={(e) => setFormData({ ...formData, clientId: String(e.target.value) })}
-                  error={!!fieldErrors.clientId}
-                  helperText={fieldErrors.clientId}
-                  InputLabelProps={{ shrink: true }}
-                  disabled={!!editingId}
-                >
-                  {clients.map((c) => (
-                    <MenuItem key={c.id} value={String(c.id)}>
-                      {c.name}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
-            </Grid>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setOpen(false)}>Cancelar</Button>
-            {editingId ? (
-              <Button onClick={handleUpdate} variant="contained" color="primary">
-                Atualizar
+  <Dialog
+  open={open}
+  onClose={handleCloseModal}
+  fullWidth
+  maxWidth="sm"
+  sx={{
+    "& .MuiDialog-paper": {
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "stretch",
+      p: 0,
+    },
+  }}
+>
+  <DialogTitle sx={{ fontWeight: "bold" }}>
+    {editingId ? "Editar Agendamento" : "Novo Agendamento"}
+  </DialogTitle>
+
+ <DialogContent
+  sx={{
+    pt: 2,
+    pb: 1,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 2,
+    overflow: "visible !important", // 👈 garante que o conteúdo não force rolagem
+    "& .MuiFormControl-root": {
+      width: "100%",
+    },
+  }}
+>
+
+  {/* Campo Título */}
+  <TextField
+    fullWidth
+    label="Título"
+    value={formData.title}
+    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+    error={!!fieldErrors.title}
+    helperText={fieldErrors.title}
+    disabled={!!editingId}
+  />
+
+  {/* Campo Descrição */}
+  <TextField
+    fullWidth
+    label="Descrição"
+    multiline
+    minRows={3}
+    value={formData.description}
+    onChange={(e) =>
+      setFormData({ ...formData, description: e.target.value })
+    }
+    error={!!fieldErrors.description}
+    helperText={fieldErrors.description}
+  />
+
+  {/* Campo Data */}
+  {!editingId && (
+    <TextField
+      fullWidth
+      type="date"
+      label="Data"
+      InputLabelProps={{ shrink: true }}
+      value={dayjs(selectedDate).format("YYYY-MM-DD")}
+      onChange={(e) => setSelectedDate(dayjs(e.target.value))}
+    />
+  )}
+
+  {/* Horários disponíveis */}
+  {!editingId && (
+    <>
+      <Typography
+        variant="subtitle1"
+        sx={{
+          mb: 1,
+          mt: 0.5,
+          fontWeight: 500,
+          color: "text.primary",
+        }}
+      >
+        Horários disponíveis
+      </Typography>
+
+      {loadingSlots ? (
+        <MDBox display="flex" justifyContent="center" alignItems="center" py={2}>
+          <CircularProgress size={24} />
+        </MDBox>
+      ) : availableSlots.length === 0 ? (
+        <Typography
+          color="text.secondary"
+          fontStyle="italic"
+          textAlign="center"
+          sx={{ py: 1 }}
+        >
+          Nenhum horário disponível neste dia
+        </Typography>
+      ) : (
+       <MDBox
+  display="flex"
+  flexWrap="wrap"
+  gap={1}
+  justifyContent="flex-start"
+  sx={{
+    backgroundColor: "#f9f9f9",
+    borderRadius: 2,
+    p: 1.5,
+    minHeight: 46,
+    mt: 1, // espaço pequeno acima
+    mb: 3, // 👈 mais espaço abaixo dos horários
+  }}
+>
+          {availableSlots.map((slot) => {
+            const time = dayjs(slot).format("HH:mm");
+            const isSelected = selectedTime === time;
+            return (
+              <Button
+                key={slot}
+                variant={isSelected ? "contained" : "outlined"}
+                color={isSelected ? "primary" : "inherit"}
+                onClick={() => setSelectedTime(time)}
+                sx={{
+                  minWidth: 80,
+                  borderRadius: 2,
+                  textTransform: "none",
+                  fontWeight: 500,
+                  fontSize: "0.9rem",
+                  px: 1.5,
+                  py: 0.7,
+                }}
+              >
+                {time}
               </Button>
-            ) : (
-              <Button onClick={handleCreate} variant="contained" color="primary">
-                Salvar
-              </Button>
-            )}
-          </DialogActions>
-        </Dialog>
+            );
+          })}
+        </MDBox>
+      )}
+    </>
+  )}
+
+  {/* Campo Cliente */}
+  <TextField
+  select
+  fullWidth
+  label="Cliente"
+  value={formData.clientId}
+  onChange={(e) =>
+    setFormData({ ...formData, clientId: String(e.target.value) })
+  }
+  error={!!fieldErrors.clientId}
+  helperText={fieldErrors.clientId}
+  InputLabelProps={{ shrink: true }}
+  disabled={!!editingId}
+  sx={{ mt: 2 }} // 👈 espaçamento extra acima do campo
+>
+  {clients.map((c) => (
+    <MenuItem key={c.id} value={String(c.id)}>
+      {c.name}
+    </MenuItem>
+  ))}
+</TextField>
+</DialogContent>
+
+
+  <DialogActions sx={{ pr: 3, pb: 2 }}>
+    <Button onClick={handleCloseModal}>Cancelar</Button>   {/* 👈 substitui aqui também */}
+    {editingId ? (
+      <Button onClick={handleUpdate} variant="contained" color="primary">
+        Atualizar
+      </Button>
+    ) : (
+      <Button onClick={handleCreate} variant="contained" color="primary">
+        Salvar
+      </Button>
+    )}
+  </DialogActions>
+</Dialog>
+
 
         {/* Dialog de Confirmação */}
         <Dialog open={confirmDialog.open} onClose={handleConfirmClose}>
