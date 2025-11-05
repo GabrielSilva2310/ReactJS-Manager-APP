@@ -38,6 +38,9 @@ import MDBox from "components/MDBox";
 import { translateError } from "utils/errorTranslator";
 import Slide from "@mui/material/Slide";
 import { getAvailability } from "services/availability";
+import { useAuth } from "contexts/AuthContext";
+
+
 
 
 dayjs.extend(utc);
@@ -92,6 +95,8 @@ const lastDateRef = useRef(null);
 const [availableSlots, setAvailableSlots] = useState([]);
 const [selectedTime, setSelectedTime] = useState("");
 const [loadingSlots, setLoadingSlots] = useState(false);
+
+const { user } = useAuth();
 
   // Snackbar
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
@@ -178,7 +183,8 @@ const [loadingSlots, setLoadingSlots] = useState(false);
     try {
       setLoadingSlots(true);
       const formattedDate = dayjs(selectedDate).format("YYYY-MM-DD");
-      const slots = await getAvailability(2, formattedDate); // 👈 ainda hardcoded
+      if (!user?.id) return; // evita erro se user ainda não carregou
+      const slots = await getAvailability(user.id, formattedDate);
       if (!cancelled) { // ✅ evita atualizar se o modal foi fechado
         setAvailableSlots(slots);
         setSelectedTime("");
