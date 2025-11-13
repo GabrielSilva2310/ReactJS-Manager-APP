@@ -31,6 +31,7 @@ import MuiAlert from "@mui/material/Alert";
 import { DateCalendar, LocalizationProvider, PickersDay } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs from "dayjs";
+import "dayjs/locale/pt-br";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import { ThemeProvider, createTheme, useTheme } from "@mui/material/styles";
@@ -121,23 +122,34 @@ const { user } = useAuth();
   };
 
   const baseTheme = useTheme();
-  const theme = createTheme({
-    ...baseTheme,
-    components: {
-      MuiPickersDay: {
-        styleOverrides: {
-          root: {
-            "&.Mui-selected": {
-              backgroundColor: "#1A73E8 !important",
-              color: "#fff",
-              "&:hover": { backgroundColor: "#1669c1 !important" },
-            },
-            "&.MuiPickersDay-today": { borderColor: "#1A73E8" },
+const theme = createTheme({
+  ...baseTheme,
+  components: {
+    MuiPickersDay: {
+      styleOverrides: {
+        root: {
+          "&.Mui-selected": {
+            backgroundColor: "#1A73E8 !important",
+            color: "#fff",
+            "&:hover": { backgroundColor: "#1669c1 !important" },
           },
+          "&.MuiPickersDay-today": { borderColor: "#1A73E8" },
         },
       },
     },
-  });
+
+    // 👇 AQUI ESTÁ O SEGREDO PARA ALTERAR OS NOMES DOS DIAS:
+    MuiDayCalendar: {
+      styleOverrides: {
+        weekDayLabel: {
+          fontSize: "14px",
+          fontWeight: 500,
+          opacity: 0.9,
+        },
+      },
+    },
+  },
+});
 
   const handleCloseModal = () => {
   setOpen(false);
@@ -440,7 +452,19 @@ const rows = useMemo(() =>
   }))
 , [filteredAppointments]);
 
+
+  useEffect(() => {
+  const weekLabels = ["D", "S", "T", "Q", "Q", "S", "S"];
+
+  const labels = document.querySelectorAll(".MuiDayCalendar-weekDayLabel");
+  labels.forEach((el, index) => {
+    el.innerHTML = weekLabels[index];
+  });
+});
+
+
 const memoizedTable = useMemo(() => ({ columns, rows }), [columns, rows]);
+
 
   // ===== RENDER =====
   return (
@@ -489,52 +513,43 @@ const memoizedTable = useMemo(() => ({ columns, rows }), [columns, rows]);
                   flexWrap: { xs: "wrap", md: "nowrap" },
                 }}
               >
-                <LocalizationProvider dateAdapter={AdapterDayjs}>
-                  <DateCalendar
-    value={selectedDate}
-   onChange={(newDate) => {
-  if (!newDate) return;
+   <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="pt-br">
+  <DateCalendar
+  value={selectedDate}
+  onChange={(newDate) => {
+    if (!newDate) return;
 
-  const normalized = dayjs(newDate).startOf("day");
-  const current = dayjs(selectedDate).startOf("day");
+    const normalized = dayjs(newDate).startOf("day");
+    const current = dayjs(selectedDate).startOf("day");
 
-  console.log("📅 onChange disparado:", newDate?.format?.("DD/MM/YYYY"));
-  console.trace("🔍 Stack trace do setSelectedDate:");
+    if (normalized.isSame(current, "day")) return;
+    if (updatingRef.current) return;
 
-  // se for o mesmo dia, nem atualiza (corta o loop)
-  if (normalized.isSame(current, "day")) return;
-
-  // se o calendário já está atualizando internamente, ignora
-  if (updatingRef.current) return;
-
-  updatingRef.current = true;
-  setSelectedDate(normalized);
-
-  // libera flag só depois do próximo render
-  requestAnimationFrame(() => {
-    updatingRef.current = false;
-  });
+    updatingRef.current = true;
+    setSelectedDate(normalized);
+    requestAnimationFrame(() => {
+      updatingRef.current = false;
+    });
+  }}
+ slots={{
+  day: (dayProps) => renderDay(dayProps.day, dayProps.value, dayProps),
 }}
+  sx={{
+    width: "100%",
+    maxWidth: 360,
+    "& .MuiPickersDay-root.Mui-selected": {
+      backgroundColor: "#1A73E8",
+      color: "#fff",
+      "&:hover": { backgroundColor: "#1669c1" },
+    },
+    "& .MuiPickersDay-today": {
+      borderColor: "#1A73E8",
+    },
+  }}
+/>
 
-    slots={{
-      day: (dayProps) => renderDay(dayProps.day, dayProps.value, dayProps),
-    }}
-    sx={{
-      width: "100%",
-      maxWidth: 360,
-      "& .MuiPickersDay-root.Mui-selected": {
-        backgroundColor: "#1A73E8",
-        color: "#fff",
-        "&:hover": {
-          backgroundColor: "#1669c1",
-        },
-      },
-      "& .MuiPickersDay-today": {
-        borderColor: "#1A73E8",
-      },
-    }}
-  />
-                </LocalizationProvider>
+</LocalizationProvider>
+
 
                <MDBox flexGrow={1} sx={{ width: "100%", overflowX: "auto" }}>
   {filteredAppointments.length === 0 ? (
