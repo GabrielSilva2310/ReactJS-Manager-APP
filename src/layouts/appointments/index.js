@@ -465,6 +465,16 @@ const rows = useMemo(() =>
 
 const memoizedTable = useMemo(() => ({ columns, rows }), [columns, rows]);
 
+// Capitalizar primeira letra do mês no header
+useEffect(() => {
+  const headerLabel = document.querySelector(".MuiPickersCalendarHeader-label");
+
+  if (headerLabel) {
+    const text = headerLabel.textContent;
+    const capitalized = text.charAt(0).toUpperCase() + text.slice(1);
+    headerLabel.textContent = capitalized;
+  }
+});
 
   // ===== RENDER =====
   return (
