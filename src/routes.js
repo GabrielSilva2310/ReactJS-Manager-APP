@@ -48,6 +48,7 @@ import SignUp from "layouts/authentication/sign-up";
 import Icon from "@mui/material/Icon";
 import Logout from "layouts/authentication/logout";
 import AppointmentsTable from "layouts/appointments";
+import WorkingPeriods from "layouts/workingperiods";
 
 const routes = [
   {
@@ -61,12 +62,21 @@ const routes = [
   },
   {
     type: "collapse",
-    name: "Appointments",
+    name: "Agendamentos",
     key: "appointments",
     icon: <Icon fontSize="small">event</Icon>,
     route: "/tables",
     component: <AppointmentsTable />,
     private: true,
+  },
+  {
+    type: "collapse",
+    name: "Disponibilidade",           
+    key: "workingperiods",            
+    icon: <Icon fontSize="small">schedule</Icon>, 
+    route: "/workingperiods",           
+    component: <WorkingPeriods />,
+    privateRoute: true,
   },
   {
     type: "collapse",
