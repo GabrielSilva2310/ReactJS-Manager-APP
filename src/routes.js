@@ -76,7 +76,7 @@ const routes = [
     icon: <Icon fontSize="small">schedule</Icon>, 
     route: "/workingperiods",           
     component: <WorkingPeriods />,
-    privateRoute: true,
+    private: true,
   },
   {
     type: "collapse",
