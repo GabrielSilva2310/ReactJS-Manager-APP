@@ -186,20 +186,49 @@ const theme = createTheme({
   }, []);
 
   
-  useEffect(() => {
-  if (!(open && !editingId && selectedDate)) return;
+ useEffect(() => {
+  if (!(open && selectedDate)) return;
 
-  let cancelled = false; // ✅ flag de cancelamento
+  let cancelled = false;
 
   const loadSlots = async () => {
     try {
       setLoadingSlots(true);
       const formattedDate = dayjs(selectedDate).format("YYYY-MM-DD");
-      if (!user?.id) return; // evita erro se user ainda não carregou
+      if (!user?.id) return;
+
       const slots = await getAvailability(user.id, formattedDate);
-      if (!cancelled) { // ✅ evita atualizar se o modal foi fechado
-        setAvailableSlots(slots);
-        setSelectedTime("");
+
+      let enhancedSlots = slots;
+
+      // 👉 se estiver editando, garante que o horário atual também aparece como opção
+      if (editingId && formData.dateTime) {
+        const currentTime = dayjs(formData.dateTime).format("HH:mm");
+
+        const exists = slots.some((slot) =>
+          dayjs(slot).format("HH:mm") === currentTime
+        );
+
+        if (!exists) {
+          const [hourStr, minuteStr] = currentTime.split(":");
+          const currentDateTime = dayjs(selectedDate)
+            .hour(Number(hourStr))
+            .minute(Number(minuteStr))
+            .second(0)
+            .millisecond(0)
+            .toISOString();
+
+          enhancedSlots = [currentDateTime, ...slots];
+        }
+      }
+
+      if (!cancelled) {
+        setAvailableSlots(enhancedSlots);
+
+        // na criação, continua limpando o horário
+        if (!editingId) {
+          setSelectedTime("");
+        }
       }
     } catch (err) {
       if (!cancelled) {
@@ -212,11 +241,10 @@ const theme = createTheme({
 
   loadSlots();
 
-  // ✅ cleanup executado quando o modal é fechado
   return () => {
     cancelled = true;
   };
-}, [open, selectedDate, editingId]);
+}, [open, selectedDate, editingId, user?.id, formData.dateTime]);
  
   // ===== ACTIONS =====
   const handleCancel = (id) => {
@@ -309,47 +337,73 @@ const theme = createTheme({
   }
 };
 
-  const handleEditOpen = (appointment) => {
-    document.activeElement.blur();
-    setEditingId(appointment.id);
-    setFormData({
-      title: appointment.title || "",
-      description: appointment.description || "",
-      dateTime: new Date(appointment.dateTime).toISOString().slice(0, 16),
-      clientId: appointment.client?.id ? String(appointment.client.id) : "",
-    });
-    setFieldErrors({});
-    setOpen(true);
-  };
+const handleEditOpen = (appointment) => {
+  document.activeElement?.blur();
+
+  setEditingId(appointment.id);
+
+  const apptDate = dayjs(appointment.dateTime);
+
+  setFormData({
+    title: appointment.title || "",
+    description: appointment.description || "",
+    dateTime: appointment.dateTime || "",
+    clientId: appointment.client?.id ? String(appointment.client.id) : "",
+  });
+
+  // dia e horário atuais do agendamento
+  setSelectedDate(apptDate.startOf("day"));
+  setSelectedTime(apptDate.format("HH:mm"));
+
+  setFieldErrors({});
+  setOpen(true);
+};  
 
   const handleUpdate = async () => {
-    try {
-      const payload = {
-        description: formData.description,
-        dateTime: new Date(formData.dateTime).toISOString(),
-      };
-      await updateAppointment(editingId, payload);
-      setOpen(false);
-      setEditingId(null);
-      setFormData({ title: "", description: "", dateTime: "", clientId: "" });
-      setFieldErrors({});
-      await loadAppointments();
-      showSnackbar("Agendamento atualizado com sucesso!");
-    } catch (err) {
-      const data = err.response?.data;
-      if (data?.errors && Array.isArray(data.errors)) {
-        const newErrors = {};
-        data.errors.forEach((e) => {
-          if (e.fieldName && e.message) newErrors[e.fieldName] = translateError(e.message);
-        });
-        setFieldErrors(newErrors);
-      } else {
-        const msg = data?.message || data?.error || "Erro inesperado";
-        showSnackbar(translateError(msg), "error");
-      }
+  try {
+    if (!selectedTime) {
+      showSnackbar("Informe o horário do agendamento!", "warning");
+      return;
     }
-  };
 
+    const [hourStr, minuteStr] = selectedTime.split(":");
+    const fullDateTime = dayjs(selectedDate)
+      .hour(Number(hourStr))
+      .minute(Number(minuteStr))
+      .second(0)
+      .millisecond(0)
+      .toISOString();
+
+    const payload = {
+      description: formData.description,
+      dateTime: fullDateTime,
+    };
+
+    await updateAppointment(editingId, payload);
+
+    setOpen(false);
+    setEditingId(null);
+    setFormData({ title: "", description: "", dateTime: "", clientId: "" });
+    setFieldErrors({});
+    setSelectedTime("");
+    setAvailableSlots([]);
+
+    await loadAppointments();
+    showSnackbar("Agendamento atualizado com sucesso!");
+  } catch (err) {
+    const data = err.response?.data;
+    if (data?.errors && Array.isArray(data.errors)) {
+      const newErrors = {};
+      data.errors.forEach((e) => {
+        if (e.fieldName && e.message) newErrors[e.fieldName] = translateError(e.message);
+      });
+      setFieldErrors(newErrors);
+    } else {
+      const msg = data?.message || data?.error || "Erro inesperado";
+      showSnackbar(translateError(msg), "error");
+    }
+  }
+};
 
   function TransitionUp(props) {
   return <Slide {...props} direction="up" />;
@@ -648,6 +702,25 @@ useEffect(() => {
     helperText={fieldErrors.description}
   />
 
+{editingId && (
+  <TextField
+    select
+    fullWidth
+    label="Horário"
+    value={selectedTime}
+    onChange={(e) => setSelectedTime(e.target.value)}
+  >
+    {availableSlots.map((slot) => {
+      const time = dayjs(slot).format("HH:mm");
+      return (
+        <MenuItem key={slot} value={time}>
+          {time}
+        </MenuItem>
+      );
+    })}
+  </TextField>
+)}
+ 
   {/* Campo Data */}
   {!editingId && (
     <TextField
