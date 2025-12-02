@@ -185,8 +185,7 @@ const theme = createTheme({
     loadClients();
   }, []);
 
-  
- useEffect(() => {
+useEffect(() => {
   if (!(open && selectedDate)) return;
 
   let cancelled = false;
@@ -200,39 +199,57 @@ const theme = createTheme({
       const slots = await getAvailability(user.id, formattedDate);
 
       let enhancedSlots = slots;
+      let keepCurrentTime = false;
 
-      // 👉 se estiver editando, garante que o horário atual também aparece como opção
       if (editingId && formData.dateTime) {
-        const currentTime = dayjs(formData.dateTime).format("HH:mm");
+        const originalDate = dayjs(formData.dateTime).startOf("day");
+        const selected = dayjs(selectedDate).startOf("day");
+        const sameDay = selected.isSame(originalDate, "day");
 
-        const exists = slots.some((slot) =>
-          dayjs(slot).format("HH:mm") === currentTime
-        );
+        if (sameDay) {
+          const currentTime = dayjs(formData.dateTime).format("HH:mm");
 
-        if (!exists) {
-          const [hourStr, minuteStr] = currentTime.split(":");
-          const currentDateTime = dayjs(selectedDate)
-            .hour(Number(hourStr))
-            .minute(Number(minuteStr))
-            .second(0)
-            .millisecond(0)
-            .toISOString();
+          const exists = slots.some((slot) =>
+            dayjs(slot).format("HH:mm") === currentTime
+          );
 
-          enhancedSlots = [currentDateTime, ...slots];
+          if (!exists) {
+            const [hourStr, minuteStr] = currentTime.split(":");
+            const currentDateTime = dayjs(selectedDate)
+              .hour(Number(hourStr))
+              .minute(Number(minuteStr))
+              .second(0)
+              .millisecond(0)
+              .toISOString();
+
+            enhancedSlots = [currentDateTime, ...slots];
+          }
+
+          keepCurrentTime = true;
         }
       }
 
       if (!cancelled) {
         setAvailableSlots(enhancedSlots);
 
-        // na criação, continua limpando o horário
-        if (!editingId) {
+        if (!keepCurrentTime) {
           setSelectedTime("");
         }
       }
     } catch (err) {
       if (!cancelled) {
-        showSnackbar("Erro ao carregar horários disponíveis", "error");
+        // 👇 LIMPA TUDO QUANDO DER ERRO
+        setAvailableSlots([]);
+        setSelectedTime("");
+
+        const backendMsg = err.response?.data?.message || err.response?.data?.error || "";
+
+        if (backendMsg.includes("No working period found")) {
+          // dia sem disponibilidade
+          showSnackbar("Nenhum horário disponível para este dia.", "warning");
+        } else {
+          showSnackbar("Erro ao carregar horários disponíveis", "error");
+        }
       }
     } finally {
       if (!cancelled) setLoadingSlots(false);
@@ -245,6 +262,7 @@ const theme = createTheme({
     cancelled = true;
   };
 }, [open, selectedDate, editingId, user?.id, formData.dateTime]);
+
  
   // ===== ACTIONS =====
   const handleCancel = (id) => {
@@ -721,17 +739,15 @@ useEffect(() => {
   </TextField>
 )}
  
-  {/* Campo Data */}
-  {!editingId && (
-    <TextField
-      fullWidth
-      type="date"
-      label="Data"
-      InputLabelProps={{ shrink: true }}
-      value={dayjs(selectedDate).format("YYYY-MM-DD")}
-      onChange={(e) => setSelectedDate(dayjs(e.target.value))}
-    />
-  )}
+ <TextField
+  fullWidth
+  type="date"
+  label="Data"
+  InputLabelProps={{ shrink: true }}
+  value={dayjs(selectedDate).format("YYYY-MM-DD")}
+  onChange={(e) => setSelectedDate(dayjs(e.target.value))}
+  sx={{ mt: 1 }}
+/>
 
   {/* Horários disponíveis */}
   {!editingId && (
