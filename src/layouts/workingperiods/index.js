@@ -9,10 +9,10 @@ import Switch from "@mui/material/Switch";
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import Divider from "@mui/material/Divider";
+import Box from "@mui/material/Box";
 
 import DashboardLayout from "examples/LayoutContainers/DashboardLayout";
 import DashboardNavbar from "examples/Navbars/DashboardNavbar";
-import Footer from "examples/Footer";
 
 import {
   getWorkingPeriods,
@@ -23,13 +23,69 @@ import {
 
 // estrutura base: 1 linha por dia
 const initialWeek = [
-  { index: 1, label: "Seg", key: "MONDAY", enabled: false, startTime: "09:00", endTime: "18:00", workingPeriodId: null },
-  { index: 2, label: "Ter", key: "TUESDAY", enabled: false, startTime: "09:00", endTime: "18:00", workingPeriodId: null },
-  { index: 3, label: "Qua", key: "WEDNESDAY", enabled: false, startTime: "09:00", endTime: "18:00", workingPeriodId: null },
-  { index: 4, label: "Qui", key: "THURSDAY", enabled: false, startTime: "09:00", endTime: "18:00", workingPeriodId: null },
-  { index: 5, label: "Sex", key: "FRIDAY", enabled: false, startTime: "09:00", endTime: "18:00", workingPeriodId: null },
-  { index: 6, label: "Sáb", key: "SATURDAY", enabled: false, startTime: "09:00", endTime: "13:00", workingPeriodId: null },
-  { index: 7, label: "Dom", key: "SUNDAY", enabled: false, startTime: "09:00", endTime: "13:00", workingPeriodId: null },
+  {
+    index: 1,
+    label: "Seg",
+    key: "MONDAY",
+    enabled: false,
+    startTime: "09:00",
+    endTime: "18:00",
+    workingPeriodId: null,
+  },
+  {
+    index: 2,
+    label: "Ter",
+    key: "TUESDAY",
+    enabled: false,
+    startTime: "09:00",
+    endTime: "18:00",
+    workingPeriodId: null,
+  },
+  {
+    index: 3,
+    label: "Qua",
+    key: "WEDNESDAY",
+    enabled: false,
+    startTime: "09:00",
+    endTime: "18:00",
+    workingPeriodId: null,
+  },
+  {
+    index: 4,
+    label: "Qui",
+    key: "THURSDAY",
+    enabled: false,
+    startTime: "09:00",
+    endTime: "18:00",
+    workingPeriodId: null,
+  },
+  {
+    index: 5,
+    label: "Sex",
+    key: "FRIDAY",
+    enabled: false,
+    startTime: "09:00",
+    endTime: "18:00",
+    workingPeriodId: null,
+  },
+  {
+    index: 6,
+    label: "Sáb",
+    key: "SATURDAY",
+    enabled: false,
+    startTime: "09:00",
+    endTime: "13:00",
+    workingPeriodId: null,
+  },
+  {
+    index: 7,
+    label: "Dom",
+    key: "SUNDAY",
+    enabled: false,
+    startTime: "09:00",
+    endTime: "13:00",
+    workingPeriodId: null,
+  },
 ];
 
 // normaliza "09:00:00" -> "09:00"
@@ -38,6 +94,82 @@ const normalizeTime = (value) => {
   if (value.length >= 5) return value.slice(0, 5);
   return value;
 };
+
+// ---- Novo componente visual para cada dia ----
+function DayCard({ day, onToggle, onTimeChange }) {
+  return (
+    <Card
+      variant="outlined"
+      sx={{
+        borderRadius: 2,
+        borderColor: day.enabled ? "primary.main" : "divider",
+        opacity: day.enabled ? 1 : 0.7,
+        transition: "all 0.2s ease-in-out",
+      }}
+    >
+      <CardContent sx={{ pb: 2 }}>
+        {/* Header: nome do dia + switch */}
+        <Box
+          display="flex"
+          alignItems="center"
+          justifyContent="space-between"
+          mb={1.5}
+        >
+          <Typography variant="subtitle1" fontWeight={600}>
+            {day.label}
+          </Typography>
+
+          <Box display="flex" alignItems="center" columnGap={1}>
+            <Typography variant="caption">
+              {day.enabled ? "Ativo" : "Inativo"}
+            </Typography>
+            <Switch
+              size="small"
+              checked={day.enabled}
+              onChange={() => onToggle(day.index)}
+            />
+          </Box>
+        </Box>
+
+        <Divider sx={{ mb: 1.5 }} />
+
+        {/* Campos de horário */}
+        <Grid container spacing={1}>
+          <Grid item xs={6}>
+            <TextField
+              fullWidth
+              label="Início"
+              type="time"
+              size="small"
+              value={day.startTime}
+              onChange={(e) =>
+                onTimeChange(day.index, "startTime", e.target.value)
+              }
+              InputLabelProps={{ shrink: true }}
+              inputProps={{ step: 300 }}
+              disabled={!day.enabled}
+            />
+          </Grid>
+          <Grid item xs={6}>
+            <TextField
+              fullWidth
+              label="Fim"
+              type="time"
+              size="small"
+              value={day.endTime}
+              onChange={(e) =>
+                onTimeChange(day.index, "endTime", e.target.value)
+              }
+              InputLabelProps={{ shrink: true }}
+              inputProps={{ step: 300 }}
+              disabled={!day.enabled}
+            />
+          </Grid>
+        </Grid>
+      </CardContent>
+    </Card>
+  );
+}
 
 function WorkingPeriods() {
   const [week, setWeek] = useState(initialWeek);
@@ -105,7 +237,9 @@ function WorkingPeriods() {
   const hasInvalidTimes = () => {
     for (const day of week) {
       if (day.enabled && day.startTime >= day.endTime) {
-        alert(`Verifique os horários de ${day.label}: o início deve ser menor que o fim.`);
+        alert(
+          `Verifique os horários de ${day.label}: o início deve ser menor que o fim.`
+        );
         return true;
       }
     }
@@ -165,8 +299,7 @@ function WorkingPeriods() {
 
   return (
     <DashboardLayout>
-      <DashboardNavbar />
-      <Card>
+      <Card sx={{ p: 2 }}>
         <CardContent>
           <Typography variant="h5" gutterBottom>
             Disponibilidade profissional
@@ -183,41 +316,13 @@ function WorkingPeriods() {
           ) : (
             <Grid container spacing={2}>
               {week.map((day) => (
-                <React.Fragment key={day.index}>
-                  <Grid item xs={12} md={2} sx={{ display: "flex", alignItems: "center" }}>
-                    <Typography sx={{ mr: 1 }}>{day.label}</Typography>
-                    <Switch
-                      checked={day.enabled}
-                      onChange={() => handleToggleDay(day.index)}
-                    />
-                  </Grid>
-
-                  <Grid item xs={6} md={3}>
-                    <TextField
-                      fullWidth
-                      label="Início"
-                      type="time"
-                      value={day.startTime}
-                      onChange={(e) => handleTimeChange(day.index, "startTime", e.target.value)}
-                      InputLabelProps={{ shrink: true }}
-                      inputProps={{ step: 300 }}
-                      disabled={!day.enabled}
-                    />
-                  </Grid>
-
-                  <Grid item xs={6} md={3}>
-                    <TextField
-                      fullWidth
-                      label="Fim"
-                      type="time"
-                      value={day.endTime}
-                      onChange={(e) => handleTimeChange(day.index, "endTime", e.target.value)}
-                      InputLabelProps={{ shrink: true }}
-                      inputProps={{ step: 300 }}
-                      disabled={!day.enabled}
-                    />
-                  </Grid>
-                </React.Fragment>
+                <Grid item xs={12} sm={6} md={4} key={day.index}>
+                  <DayCard
+                    day={day}
+                    onToggle={handleToggleDay}
+                    onTimeChange={handleTimeChange}
+                  />
+                </Grid>
               ))}
             </Grid>
           )}
@@ -237,7 +342,14 @@ function WorkingPeriods() {
           </Button>
         </CardActions>
       </Card>
-      <Footer />
+          <style>
+      {`
+        .fixed-plugin-button,
+        .fixed-plugin {
+          display: none !important;
+        }
+      `}
+    </style>
     </DashboardLayout>
   );
 }

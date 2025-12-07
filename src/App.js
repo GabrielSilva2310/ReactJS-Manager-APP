@@ -64,6 +64,9 @@ export default function App() {
   const [rtlCache, setRtlCache] = useState(null);
   const { pathname } = useLocation();
 
+  // 👉 Flag para exibir/ocultar Configurator e engrenagem
+  const SHOW_CONFIGURATOR = false;
+
   // Cache for the rtl
   useMemo(() => {
     const cacheRtl = createCache({
@@ -170,15 +173,15 @@ export default function App() {
               color={sidenavColor}
               brand={(transparentSidenav && !darkMode) || whiteSidenav ? brandDark : brandWhite}
               brandName="Manager APP"
-              routes={menuRoutes}  
+              routes={menuRoutes}
               onMouseEnter={handleOnMouseEnter}
               onMouseLeave={handleOnMouseLeave}
             />
-            <Configurator />
-            {configsButton}
+            {SHOW_CONFIGURATOR && <Configurator />}
+            {SHOW_CONFIGURATOR && configsButton}
           </>
         )}
-        {layout === "vr" && <Configurator />}
+        {layout === "vr" && SHOW_CONFIGURATOR && <Configurator />}
         <Routes>
           {getRoutes(routes)} {/* ← todas as rotas continuam registradas */}
           <Route path="*" element={<Navigate to="/authentication/sign-in" replace />} />
@@ -194,15 +197,15 @@ export default function App() {
             color={sidenavColor}
             brand={(transparentSidenav && !darkMode) || whiteSidenav ? brandDark : brandWhite}
             brandName="Manager APP"
-            routes={menuRoutes}  
+            routes={menuRoutes}
             onMouseEnter={handleOnMouseEnter}
             onMouseLeave={handleOnMouseLeave}
           />
-          <Configurator />
-          {configsButton}
+          {SHOW_CONFIGURATOR && <Configurator />}
+          {SHOW_CONFIGURATOR && configsButton}
         </>
       )}
-      {layout === "vr" && <Configurator />}
+      {layout === "vr" && SHOW_CONFIGURATOR && <Configurator />}
       <Routes>
         {getRoutes(routes)} {/* ← todas as rotas continuam registradas */}
         <Route path="*" element={<Navigate to="/authentication/sign-in" replace />} />
