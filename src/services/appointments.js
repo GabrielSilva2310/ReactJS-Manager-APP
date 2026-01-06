@@ -1,9 +1,9 @@
 import api from "./api";
 
-export async function getAppointments() {
-  const response = await api.get("/appointments");
-  return response.data.content || [];
-}
+export const getAppointments = async (params) => {
+  const response = await api.get("/appointments", { params });
+  return response.data;
+};
 
 export async function createAppointment(data) {
   const response = await api.post("/appointments", data);

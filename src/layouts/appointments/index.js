@@ -74,6 +74,20 @@ const getStatusChip = (status) => {
   }
 };
 
+const normalizeStatus = (status) => {
+  if (typeof status === "string") {
+    return status.toUpperCase();
+  }
+
+  switch (status) {
+    case 0: return "SCHEDULED";
+    case 1: return "CANCELED";
+    case 2: return "DONE";
+    case 3: return "NO_SHOW";
+    default: return "";
+  }
+};
+
 function AppointmentsTable() {
   let renderCount = 0;
 
@@ -97,7 +111,13 @@ const [availableSlots, setAvailableSlots] = useState([]);
 const [selectedTime, setSelectedTime] = useState("");
 const [loadingSlots, setLoadingSlots] = useState(false);
 
+const [filterClient, setFilterClient] = useState("");
+const [filterStatus, setFilterStatus] = useState("");
+
 const { user } = useAuth();
+const reloadRef = useRef(0);
+
+
 
   // Snackbar
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
@@ -162,14 +182,33 @@ const theme = createTheme({
 
   // ===== LOAD DATA =====
   const loadAppointments = async () => {
-    setLoading(true);
-    try {
-      const data = await getAppointments();
-      setAppointments(data);
-    } finally {
-      setLoading(false);
-    }
-  };
+  setLoading(true);
+  try {
+    const params = {};
+
+    // filtros
+    if (filterClient) params.clientId = filterClient;
+    if (filterStatus) params.status = filterStatus;
+
+    // calendário → intervalo do dia
+    const dateStr = dayjs(selectedDate).format("YYYY-MM-DD");
+    params.startDate = dateStr;
+    params.endDate = dateStr;
+
+    // paginação (ajuste depois se quiser)
+    params.page = 0;
+    params.size = 50;
+
+    const data = await getAppointments(params);
+
+    // ⚠️ se backend é paginado
+    setAppointments(data.content ?? data);
+  } catch (err) {
+    showSnackbar("Erro ao carregar agendamentos", "error");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const loadClients = async () => {
     try {
@@ -181,9 +220,12 @@ const theme = createTheme({
   };
 
   useEffect(() => {
-    loadAppointments();
-    loadClients();
-  }, []);
+  loadClients();
+}, []);
+
+useEffect(() => {
+  loadAppointments();
+}, [selectedDate, filterClient, filterStatus, reloadRef.current]);
 
 useEffect(() => {
   if (!(open && selectedDate)) return;
@@ -269,7 +311,8 @@ useEffect(() => {
     openConfirmDialog("Cancelar Agendamento", "Tem certeza que deseja cancelar este agendamento?", async () => {
       try {
         await cancelAppointment(id);
-        await loadAppointments();
+        reloadRef.current++;
+        loadAppointments();
         showSnackbar("Agendamento cancelado!");
       } catch (err) {
         const msg = err.response?.data?.message || err.response?.data?.error || "Erro inesperado";
@@ -282,7 +325,8 @@ useEffect(() => {
     openConfirmDialog("Concluir Agendamento", "Marcar este agendamento como concluído?", async () => {
       try {
         await doneAppointment(id);
-        await loadAppointments();
+        reloadRef.current++;
+        loadAppointments();
         showSnackbar("Agendamento concluído!");
       } catch (err) {
         const msg = err.response?.data?.message || err.response?.data?.error || "Erro inesperado";
@@ -295,7 +339,8 @@ useEffect(() => {
     openConfirmDialog("Não Compareceu", "Marcar este agendamento como 'Não compareceu'?", async () => {
       try {
         await noShowAppointment(id);
-        await loadAppointments();
+        reloadRef.current++;
+        loadAppointments();
         showSnackbar("Marcado como 'Não Compareceu'.");
       } catch (err) {
         const msg = err.response?.data?.message || err.response?.data?.error || "Erro inesperado";
@@ -325,7 +370,8 @@ useEffect(() => {
     };
 
     await createAppointment(payload);
-    await loadAppointments();
+    reloadRef.current++;
+    loadAppointments(); 
 
     updatingRef.current = true;
     const newDate = dayjs(fullDateTime).startOf("day");
@@ -406,7 +452,8 @@ const handleEditOpen = (appointment) => {
     setSelectedTime("");
     setAvailableSlots([]);
 
-    await loadAppointments();
+    reloadRef.current++;
+    loadAppointments();
     showSnackbar("Agendamento atualizado com sucesso!");
   } catch (err) {
     const data = err.response?.data;
@@ -428,11 +475,7 @@ const handleEditOpen = (appointment) => {
   }
 
 
-  const filteredAppointments = useMemo(() => {
-  return appointments.filter((a) =>
-    dayjs(a.dateTime).isSame(selectedDate, "day")
-  );
-}, [appointments, selectedDate]);
+const filteredAppointments = useMemo(() => appointments, [appointments]);
 
 const renderDay = useCallback(
   (day, _value, DayComponentProps) => {
@@ -579,6 +622,119 @@ useEffect(() => {
                 Novo Agendamento
               </Button>
             </MDBox>
+
+            {/* Card de Filtros */}
+            
+            <MDBox mb={3}>
+  <Card
+    sx={{
+      borderRadius: 2,
+      boxShadow: 1,
+      p: 2,
+      backgroundColor: "#fff",
+    }}
+  >
+    <Grid container spacing={2} alignItems="center">
+      {/* Filtro por Cliente */}
+      <Grid item xs={12} md={4}>
+        <TextField
+          select
+          fullWidth
+          size="small"
+          label="Cliente"
+          value={filterClient}
+          onChange={(e) => setFilterClient(e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          SelectProps={{
+            displayEmpty: true,
+            renderValue: (value) => {
+              if (!value) {
+                return "Todos os clientes";
+              }
+              const selected = clients.find(
+                (c) => String(c.id) === String(value)
+              );
+              return selected ? selected.name : "";
+            },
+          }}
+        >
+          <MenuItem value="">
+            <em>Todos os clientes</em>
+          </MenuItem>
+          {clients.map((c) => (
+            <MenuItem key={c.id} value={String(c.id)}>
+              {c.name}
+            </MenuItem>
+          ))}
+        </TextField>
+      </Grid>
+
+      {/* Filtro por Status */}
+      <Grid item xs={12} md={4}>
+        <TextField
+          select
+          fullWidth
+          size="small"
+          label="Status"
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          SelectProps={{
+            displayEmpty: true,
+            renderValue: (value) => {
+              if (!value) {
+                return "Todos os status";
+              }
+              switch (value) {
+                case "SCHEDULED":
+                  return "Agendado";
+                case "CANCELED":
+                  return "Cancelado";
+                case "DONE":
+                  return "Concluído";
+                case "NO_SHOW":
+                  return "Não Compareceu";
+                default:
+                  return "";
+              }
+            },
+          }}
+        >
+          <MenuItem value="">
+            <em>Todos os status</em>
+          </MenuItem>
+          <MenuItem value="SCHEDULED">Agendado</MenuItem>
+          <MenuItem value="CANCELED">Cancelado</MenuItem>
+          <MenuItem value="DONE">Concluído</MenuItem>
+          <MenuItem value="NO_SHOW">Não Compareceu</MenuItem>
+        </TextField>
+      </Grid>
+
+      {/* Botão Limpar */}
+      <Grid
+        item
+        xs={12}
+        md={4}
+        sx={{
+          display: "flex",
+          justifyContent: { xs: "flex-start", md: "flex-end" },
+          alignItems: "center",
+          gap: 1,
+        }}
+      >
+        <Button
+          variant="outlined"
+          onClick={() => {
+            setFilterClient("");
+            setFilterStatus("");
+          }}
+        >
+          Limpar filtros
+        </Button>
+      </Grid>
+    </Grid>
+  </Card>
+</MDBox>
 
             {loading ? (
               <MDBox display="flex" justifyContent="center" alignItems="center" minHeight="300px">
