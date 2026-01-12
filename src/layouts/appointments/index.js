@@ -114,9 +114,16 @@ const [loadingSlots, setLoadingSlots] = useState(false);
 const [filterClient, setFilterClient] = useState("");
 const [filterStatus, setFilterStatus] = useState("");
 
+const [page, setPage] = useState(0);      
+const [size, setSize] = useState(10);  
+const [totalPages, setTotalPages] = useState(0);
+const [totalElements, setTotalElements] = useState(0);
+
 const { user } = useAuth();
 const reloadRef = useRef(0);
 
+const from = totalElements === 0 ? 0 : page * size + 1;
+const to = Math.min((page + 1) * size, totalElements);
 
 
   // Snackbar
@@ -180,8 +187,7 @@ const theme = createTheme({
   setFieldErrors({});
 };
 
-  // ===== LOAD DATA =====
-  const loadAppointments = async () => {
+ const loadAppointments = async () => {
   setLoading(true);
   try {
     const params = {};
@@ -190,19 +196,27 @@ const theme = createTheme({
     if (filterClient) params.clientId = filterClient;
     if (filterStatus) params.status = filterStatus;
 
-    // calendário → intervalo do dia
-    const dateStr = dayjs(selectedDate).format("YYYY-MM-DD");
-    params.startDate = dateStr;
-    params.endDate = dateStr;
+    // calendário → intervalo do dia (Instant)
+   params.startDateTime = dayjs(selectedDate).startOf("day").toISOString();
+   params.endDateTime = dayjs(selectedDate).endOf("day").toISOString();
 
-    // paginação (ajuste depois se quiser)
-    params.page = 0;
-    params.size = 50;
+    // paginação
+    params.page = page;
+    params.size = size;
 
     const data = await getAppointments(params);
 
-    // ⚠️ se backend é paginado
-    setAppointments(data.content ?? data);
+    // ✅ quando vem paginado (Spring Page)
+    if (data && Array.isArray(data.content)) {
+      setAppointments(data.content);
+      setTotalPages(data.totalPages ?? 0);
+      setTotalElements(data.totalElements ?? 0);
+    } else {
+      // fallback (se algum dia vier lista)
+      setAppointments(data ?? []);
+      setTotalPages(1);
+      setTotalElements((data ?? []).length);
+    }
   } catch (err) {
     showSnackbar("Erro ao carregar agendamentos", "error");
   } finally {
@@ -219,13 +233,18 @@ const theme = createTheme({
     }
   };
 
-  useEffect(() => {
+ useEffect(() => {
   loadClients();
 }, []);
 
 useEffect(() => {
+  setPage((prev) => (prev === 0 ? prev : 0));
+}, [selectedDate, filterClient, filterStatus]);
+
+useEffect(() => {
   loadAppointments();
-}, [selectedDate, filterClient, filterStatus, reloadRef.current]);
+}, [page, size, selectedDate, filterClient, filterStatus]);
+
 
 useEffect(() => {
   if (!(open && selectedDate)) return;
@@ -311,8 +330,7 @@ useEffect(() => {
     openConfirmDialog("Cancelar Agendamento", "Tem certeza que deseja cancelar este agendamento?", async () => {
       try {
         await cancelAppointment(id);
-        reloadRef.current++;
-        loadAppointments();
+        await loadAppointments(); // mantém a page atual
         showSnackbar("Agendamento cancelado!");
       } catch (err) {
         const msg = err.response?.data?.message || err.response?.data?.error || "Erro inesperado";
@@ -325,8 +343,7 @@ useEffect(() => {
     openConfirmDialog("Concluir Agendamento", "Marcar este agendamento como concluído?", async () => {
       try {
         await doneAppointment(id);
-        reloadRef.current++;
-        loadAppointments();
+        await loadAppointments(); // mantém a page atual
         showSnackbar("Agendamento concluído!");
       } catch (err) {
         const msg = err.response?.data?.message || err.response?.data?.error || "Erro inesperado";
@@ -339,8 +356,7 @@ useEffect(() => {
     openConfirmDialog("Não Compareceu", "Marcar este agendamento como 'Não compareceu'?", async () => {
       try {
         await noShowAppointment(id);
-        reloadRef.current++;
-        loadAppointments();
+        await loadAppointments(); // mantém a page atual
         showSnackbar("Marcado como 'Não Compareceu'.");
       } catch (err) {
         const msg = err.response?.data?.message || err.response?.data?.error || "Erro inesperado";
@@ -370,12 +386,14 @@ useEffect(() => {
     };
 
     await createAppointment(payload);
-    reloadRef.current++;
-    loadAppointments(); 
 
     updatingRef.current = true;
+
     const newDate = dayjs(fullDateTime).startOf("day");
     setSelectedDate(newDate);
+
+    setPage(0);
+
     lastDateRef.current = newDate;
     setTimeout(() => (updatingRef.current = false), 300);
 
@@ -802,6 +820,7 @@ useEffect(() => {
       Nenhum agendamento neste dia
     </MDBox>
   ) : (
+     <MDBox>
     <DataTable
       table={memoizedTable}
       isSorted={false}
@@ -809,7 +828,62 @@ useEffect(() => {
       showTotalEntries={false}
       noEndBorder
     />
-  )}
+
+    {/* Paginação */}
+    {/* Paginação */}
+<MDBox
+  mt={2}
+  display="flex"
+  justifyContent="space-between"
+  alignItems="center"
+  flexWrap="wrap"
+  gap={1}
+>
+  <Typography variant="button" color="text.secondary">
+    {totalElements === 0
+      ? "Nenhum registro"
+      : `Mostrando ${from}-${to} de ${totalElements} • Página ${page + 1} de ${totalPages}`}
+  </Typography>
+
+  <MDBox display="flex" gap={1} alignItems="center">
+    <Button
+      variant="outlined"
+      disabled={page <= 0}
+      onClick={() => setPage((p) => Math.max(0, p - 1))}
+    >
+      Anterior
+    </Button>
+
+    <Button
+      variant="outlined"
+      disabled={totalPages === 0 || page >= totalPages - 1}
+      onClick={() => setPage((p) => p + 1)}
+    >
+      Próxima
+    </Button>
+
+    {/* Só mostra quando fizer sentido */}
+    {totalElements > 10 && (
+      <TextField
+        select
+        size="small"
+        label="Por página"
+        value={size}
+        onChange={(e) => setSize(Number(e.target.value))}
+        InputLabelProps={{ shrink: true }}
+        sx={{ width: 140 }}
+      >
+        <MenuItem value={5}>5</MenuItem>
+        <MenuItem value={10}>10</MenuItem>
+        <MenuItem value={20}>20</MenuItem>
+        <MenuItem value={50}>50</MenuItem>
+      </TextField>
+    )}
+  </MDBox>
+</MDBox>
+
+  </MDBox>
+)}
 </MDBox>
 
               </MDBox>
