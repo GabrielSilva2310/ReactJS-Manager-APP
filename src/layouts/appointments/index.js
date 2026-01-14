@@ -558,30 +558,47 @@ const rows = useMemo(() =>
       timeStyle: "short",
     }),
     status: getStatusChip(a.status),
-    actions: (
-      <MDBox display="flex" justifyContent="center" gap={0.5}>
-        <Tooltip title="Editar">
-          <IconButton color="primary" size="small" onClick={() => handleEditOpen(a)}>
-            <i className="material-icons">edit</i>
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="Cancelar">
-          <IconButton color="error" size="small" onClick={() => handleCancel(a.id)}>
-            <i className="material-icons">close</i>
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="Concluir">
-          <IconButton color="success" size="small" onClick={() => handleDone(a.id)}>
-            <i className="material-icons">check</i>
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="Não Compareceu">
-          <IconButton color="warning" size="small" onClick={() => handleNoShow(a.id)}>
-            <i className="material-icons">block</i>
-          </IconButton>
-        </Tooltip>
-      </MDBox>
-    ),
+   actions: (
+  <MDBox display="flex" justifyContent="center" gap={0.5}>
+    {a.canEdit && (
+      <Tooltip title="Editar">
+        <IconButton color="primary" size="small" onClick={() => handleEditOpen(a)}>
+          <i className="material-icons">edit</i>
+        </IconButton>
+      </Tooltip>
+    )}
+
+    {a.canCancel && (
+      <Tooltip title="Cancelar">
+        <IconButton color="error" size="small" onClick={() => handleCancel(a.id)}>
+          <i className="material-icons">close</i>
+        </IconButton>
+      </Tooltip>
+    )}
+
+    {a.canDone && (
+      <Tooltip title="Concluir">
+        <IconButton color="success" size="small" onClick={() => handleDone(a.id)}>
+          <i className="material-icons">check</i>
+        </IconButton>
+      </Tooltip>
+    )}
+
+    {a.canNoShow && (
+      <Tooltip title="Não Compareceu">
+        <IconButton color="warning" size="small" onClick={() => handleNoShow(a.id)}>
+          <i className="material-icons">block</i>
+        </IconButton>
+      </Tooltip>
+    )}
+
+    {!a.canEdit && !a.canCancel && !a.canDone && !a.canNoShow && (
+      <Typography variant="caption" color="text.secondary">
+        —
+      </Typography>
+    )}
+  </MDBox>
+),
   }))
 , [filteredAppointments]);
 
