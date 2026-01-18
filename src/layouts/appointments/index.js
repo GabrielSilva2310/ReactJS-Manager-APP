@@ -125,6 +125,9 @@ const reloadRef = useRef(0);
 const from = totalElements === 0 ? 0 : page * size + 1;
 const to = Math.min((page + 1) * size, totalElements);
 
+const [rangeStart, setRangeStart] = useState(""); 
+const [rangeEnd, setRangeEnd] = useState("");     
+
 
   // Snackbar
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
@@ -196,9 +199,23 @@ const theme = createTheme({
     if (filterClient) params.clientId = filterClient;
     if (filterStatus) params.status = filterStatus;
 
-    // calendário → intervalo do dia (Instant)
-   params.startDateTime = dayjs(selectedDate).startOf("day").toISOString();
-   params.endDateTime = dayjs(selectedDate).endOf("day").toISOString();
+   // intervalo de data/hora (range tem prioridade)
+let start;
+let end;
+
+if (rangeStart || rangeEnd) {
+  const startStr = rangeStart || rangeEnd;
+  const endStr = rangeEnd || rangeStart;
+
+  start = dayjs(startStr).startOf("day").toISOString();
+  end = dayjs(endStr).endOf("day").toISOString();
+} else {
+  start = dayjs(selectedDate).startOf("day").toISOString();
+  end = dayjs(selectedDate).endOf("day").toISOString();
+}
+
+params.startDateTime = start;
+params.endDateTime = end;
 
     // paginação
     params.page = page;
@@ -239,11 +256,11 @@ const theme = createTheme({
 
 useEffect(() => {
   setPage((prev) => (prev === 0 ? prev : 0));
-}, [selectedDate, filterClient, filterStatus]);
+}, [selectedDate, filterClient, filterStatus, rangeStart, rangeEnd]);
 
 useEffect(() => {
   loadAppointments();
-}, [page, size, selectedDate, filterClient, filterStatus]);
+}, [page, size, selectedDate, filterClient, filterStatus, rangeStart, rangeEnd]);
 
 
 useEffect(() => {
@@ -745,6 +762,32 @@ useEffect(() => {
         </TextField>
       </Grid>
 
+       {/* Range: Início */}
+<Grid item xs={12} md={4}>
+  <TextField
+    fullWidth
+    size="small"
+    type="date"
+    label="Início"
+    InputLabelProps={{ shrink: true }}
+    value={rangeStart}
+    onChange={(e) => setRangeStart(e.target.value)}
+  />
+</Grid>
+
+{/* Range: Fim */}
+<Grid item xs={12} md={4}>
+  <TextField
+    fullWidth
+    size="small"
+    type="date"
+    label="Fim"
+    InputLabelProps={{ shrink: true }}
+    value={rangeEnd}
+    onChange={(e) => setRangeEnd(e.target.value)}
+  />
+</Grid>
+
       {/* Botão Limpar */}
       <Grid
         item
@@ -762,6 +805,8 @@ useEffect(() => {
           onClick={() => {
             setFilterClient("");
             setFilterStatus("");
+            setRangeStart("");
+            setRangeEnd("");
           }}
         >
           Limpar filtros
@@ -790,20 +835,24 @@ useEffect(() => {
   <DateCalendar
   value={selectedDate}
   onChange={(newDate) => {
-    if (!newDate) return;
+  if (!newDate) return;
 
-    const normalized = dayjs(newDate).startOf("day");
-    const current = dayjs(selectedDate).startOf("day");
+  const normalized = dayjs(newDate).startOf("day");
+  const current = dayjs(selectedDate).startOf("day");
 
-    if (normalized.isSame(current, "day")) return;
-    if (updatingRef.current) return;
+  if (normalized.isSame(current, "day")) return;
+  if (updatingRef.current) return;
 
-    updatingRef.current = true;
-    setSelectedDate(normalized);
-    requestAnimationFrame(() => {
-      updatingRef.current = false;
-    });
-  }}
+  // 👇 sair do modo range ao clicar no calendário
+  setRangeStart("");
+  setRangeEnd("");
+
+  updatingRef.current = true;
+  setSelectedDate(normalized);
+  requestAnimationFrame(() => {
+    updatingRef.current = false;
+  });
+}}
  slots={{
   day: (dayProps) => renderDay(dayProps.day, dayProps.value, dayProps),
 }}
