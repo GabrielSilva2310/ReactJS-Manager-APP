@@ -40,6 +40,7 @@ import { translateError } from "utils/errorTranslator";
 import Slide from "@mui/material/Slide";
 import { getAvailability } from "services/availability";
 import { useAuth } from "contexts/AuthContext";
+import { useReactToPrint } from "react-to-print";
 
 
 
@@ -127,6 +128,95 @@ const to = Math.min((page + 1) * size, totalElements);
 
 const [rangeStart, setRangeStart] = useState(""); 
 const [rangeEnd, setRangeEnd] = useState("");     
+
+const [printAppointments, setPrintAppointments] = useState([]);
+const [isPreparingPrint, setIsPreparingPrint] = useState(false);
+
+// ===== PRINT =====
+const printRef = useRef(null);
+
+const handlePrint = useReactToPrint({
+contentRef: printRef,
+documentTitle: `agendamentos_${dayjs().format("YYYY-MM-DD_HH-mm")}`,
+onAfterPrint: () => setPrintAppointments([]),
+});
+
+// ✅ FUNÇÃO FORA DO useMemo
+const prepareAndPrint = async () => {
+  try {
+    if (totalElements === 0) return;
+
+    setIsPreparingPrint(true);
+
+    const params = {};
+
+    if (filterClient) params.clientId = filterClient;
+    if (filterStatus) params.status = filterStatus;
+
+    let start;
+    let end;
+
+    if (rangeStart || rangeEnd) {
+      const startStr = rangeStart || rangeEnd;
+      const endStr = rangeEnd || rangeStart;
+
+      start = dayjs(startStr).startOf("day").toISOString();
+      end = dayjs(endStr).endOf("day").toISOString();
+    } else {
+      start = dayjs(selectedDate).startOf("day").toISOString();
+      end = dayjs(selectedDate).endOf("day").toISOString();
+    }
+
+    params.startDateTime = start;
+    params.endDateTime = end;
+
+    params.page = 0;
+    params.size = totalElements; // tentativa simples
+
+    const data = await getAppointments(params);
+    const all = Array.isArray(data?.content) ? data.content : (data ?? []);
+
+    setPrintAppointments(all);
+
+    setTimeout(() => handlePrint(), 0);
+  } catch (err) {
+    showSnackbar("Erro ao preparar impressão", "error");
+  } finally {
+    setIsPreparingPrint(false);
+  }
+};
+
+const filtersSummary = useMemo(() => {
+  const parts = [];
+
+  // período (range tem prioridade)
+  if (rangeStart || rangeEnd) {
+    const ini = rangeStart || rangeEnd;
+    const fim = rangeEnd || rangeStart;
+    parts.push(`Período: ${dayjs(ini).format("DD/MM/YYYY")} até ${dayjs(fim).format("DD/MM/YYYY")}`);
+  } else {
+    parts.push(`Dia: ${dayjs(selectedDate).format("DD/MM/YYYY")}`);
+  }
+
+  // cliente
+  if (filterClient) {
+    const c = clients.find((x) => String(x.id) === String(filterClient));
+    parts.push(`Cliente: ${c ? c.name : filterClient}`);
+  } else {
+    parts.push("Cliente: Todos");
+  }
+
+  // status
+  const statusMap = {
+    SCHEDULED: "Agendado",
+    CANCELED: "Cancelado",
+    DONE: "Concluído",
+    NO_SHOW: "Não Compareceu",
+  };
+  parts.push(`Status: ${filterStatus ? (statusMap[filterStatus] || filterStatus) : "Todos"}`);
+
+  return parts.join(" | ");
+}, [rangeStart, rangeEnd, selectedDate, filterClient, filterStatus, clients]);
 
 
   // Snackbar
@@ -632,6 +722,49 @@ const rows = useMemo(() =>
 
 const memoizedTable = useMemo(() => ({ columns, rows }), [columns, rows]);
 
+const statusLabel = (s) => {
+const normalized = typeof s === "string" ? s.toUpperCase() : s;
+
+
+switch (normalized) {
+case 0:
+case "SCHEDULED":
+return "Agendado";
+case 1:
+case "CANCELED":
+return "Cancelado";
+case 2:
+case "DONE":
+return "Concluído";
+case 3:
+case "NO_SHOW":
+return "Não Compareceu";
+default:
+return "Desconhecido";
+}
+};
+
+const printRows = useMemo(() => {
+  const list = printAppointments.length ? printAppointments : filteredAppointments;
+
+  return list.map((a) => ({
+    client: a.client?.name,
+    title: a.title,
+    description: a.description,
+    dateTime: new Date(a.dateTime).toLocaleString("pt-BR", {
+      dateStyle: "short",
+      timeStyle: "short",
+    }),
+    status: statusLabel(a.status),
+    actions: null,
+  }));
+}, [printAppointments, filteredAppointments]);
+
+const printTable = useMemo(
+  () => ({ columns, rows: printRows }),
+  [columns, printRows]
+);
+
 // Capitalizar primeira letra do mês no header
 useEffect(() => {
   const headerLabel = document.querySelector(".MuiPickersCalendarHeader-label");
@@ -653,26 +786,49 @@ useEffect(() => {
               <Typography variant="h5" fontWeight="bold">
                 Agendamentos
               </Typography>
-              <Button
-                variant="contained"
-                color="primary"
-                disableElevation
-                sx={{
-                  height: "40px",
-                  color: "#fff",
-                  backgroundColor: "#1A73E8",
-                  "&:hover": { backgroundColor: "#1669c1" },
-                  cursor: "pointer",
-                }}
-                onClick={() => {
-                  setEditingId(null);
-                  setFormData({ title: "", description: "", dateTime: "", clientId: "" });
-                  setFieldErrors({});
-                  setOpen(true);
-                }}
-              >
-                Novo Agendamento
-              </Button>
+              <MDBox display="flex" gap={1} alignItems="center">
+                <Tooltip
+  title={
+    loading
+      ? "Carregando agendamentos..."
+      : filteredAppointments.length === 0
+      ? "Não há agendamentos para imprimir com os filtros atuais"
+      : "Imprimir"
+  }
+  >
+  <span>
+  <Button 
+  variant="outlined" 
+  onClick={prepareAndPrint}
+  disabled={loading || filteredAppointments.length === 0 || isPreparingPrint}
+  sx={{ height: "40px" }}>
+    Imprimir
+  </Button>
+   </span>
+</Tooltip>
+
+  <Button
+    variant="contained"
+    color="primary"
+    disableElevation
+    sx={{
+      height: "40px",
+      color: "#fff",
+      backgroundColor: "#1A73E8",
+      "&:hover": { backgroundColor: "#1669c1" },
+      cursor: "pointer",
+    }}
+    onClick={() => {
+      setEditingId(null);
+      setFormData({ title: "", description: "", dateTime: "", clientId: "" });
+      setFieldErrors({});
+      setOpen(true);
+    }}
+  >
+    Novo Agendamento
+  </Button>
+</MDBox>
+
             </MDBox>
 
             {/* Card de Filtros */}
@@ -873,7 +1029,7 @@ useEffect(() => {
 </LocalizationProvider>
 
 
-               <MDBox flexGrow={1} sx={{ width: "100%", overflowX: "auto" }}>
+             <MDBox flexGrow={1} sx={{ width: "100%", overflowX: "auto" }}>
   {filteredAppointments.length === 0 ? (
     <MDBox
       display="flex"
@@ -886,71 +1042,120 @@ useEffect(() => {
       Nenhum agendamento neste dia
     </MDBox>
   ) : (
-     <MDBox>
-    <DataTable
-      table={memoizedTable}
-      isSorted={false}
-      entriesPerPage={false}
-      showTotalEntries={false}
-      noEndBorder
-    />
+    <MDBox>
+ {/* ===== SCREEN (normal) ===== */}
+<div className="no-print">
+{/* tabela normal da tela */}
+<DataTable
+table={memoizedTable}
+isSorted={false}
+entriesPerPage={false}
+showTotalEntries={false}
+pagination={false}
+noEndBorder
+/>
 
-    {/* Paginação */}
-    {/* Paginação */}
+
+{/* sua paginação atual */}
 <MDBox
-  mt={2}
-  display="flex"
-  justifyContent="space-between"
-  alignItems="center"
-  flexWrap="wrap"
-  gap={1}
+mt={2}
+display="flex"
+justifyContent="space-between"
+alignItems="center"
+flexWrap="wrap"
+gap={1}
 >
-  <Typography variant="button" color="text.secondary">
-    {totalElements === 0
-      ? "Nenhum registro"
-      : `Mostrando ${from}-${to} de ${totalElements} • Página ${page + 1} de ${totalPages}`}
-  </Typography>
+<Typography variant="button" color="text.secondary">
+{totalElements === 0
+? "Nenhum registro"
+: `Mostrando ${from}-${to} de ${totalElements} • Página ${page + 1} de ${totalPages}`}
+</Typography>
 
-  <MDBox display="flex" gap={1} alignItems="center">
-    <Button
-      variant="outlined"
-      disabled={page <= 0}
-      onClick={() => setPage((p) => Math.max(0, p - 1))}
-    >
-      Anterior
-    </Button>
 
-    <Button
-      variant="outlined"
-      disabled={totalPages === 0 || page >= totalPages - 1}
-      onClick={() => setPage((p) => p + 1)}
-    >
-      Próxima
-    </Button>
+<MDBox display="flex" gap={1} alignItems="center">
+<Button
+variant="outlined"
+disabled={page <= 0}
+onClick={() => setPage((p) => Math.max(0, p - 1))}
+>
+Anterior
+</Button>
 
-    {/* Só mostra quando fizer sentido */}
-    {totalElements > 10 && (
-      <TextField
-        select
-        size="small"
-        label="Por página"
-        value={size}
-        onChange={(e) => setSize(Number(e.target.value))}
-        InputLabelProps={{ shrink: true }}
-        sx={{ width: 140 }}
-      >
-        <MenuItem value={5}>5</MenuItem>
-        <MenuItem value={10}>10</MenuItem>
-        <MenuItem value={20}>20</MenuItem>
-        <MenuItem value={50}>50</MenuItem>
-      </TextField>
-    )}
-  </MDBox>
-</MDBox>
 
-  </MDBox>
+<Button
+variant="outlined"
+disabled={totalPages === 0 || page >= totalPages - 1}
+onClick={() => setPage((p) => p + 1)}
+>
+Próxima
+</Button>
+
+
+{totalElements >= 10 && (
+<TextField
+select
+size="small"
+label="Por página"
+value={size}
+onChange={(e) => setSize(Number(e.target.value))}
+InputLabelProps={{ shrink: true }}
+sx={{ width: 140 }}
+>
+<MenuItem value={5}>5</MenuItem>
+<MenuItem value={10}>10</MenuItem>
+<MenuItem value={20}>20</MenuItem>
+<MenuItem value={50}>50</MenuItem>
+</TextField>
 )}
 </MDBox>
+</MDBox>
+</div>
+
+
+{/* ===== PRINT (fora da tela) ===== */}
+<div style={{ position: "fixed", left: "-10000px", top: 0 }}>
+<div id="print-area" ref={printRef}>
+<div className="print-header">
+<h2 style={{ margin: 0 }}>Agendamentos</h2>
+<div className="print-subtitle">{filtersSummary}</div>
+<div className="print-meta">Gerado em: {new Date().toLocaleString("pt-BR")}</div>
+<div className="print-meta">
+Total: {printAppointments.length} agendamento
+{printAppointments.length === 1 ? "" : "s"}
+</div>
+</div>
+
+<table className="print-native-table">
+<thead>
+<tr>
+<th>Cliente</th>
+<th>Título</th>
+<th>Descrição</th>
+<th>Data/Horário</th>
+<th>Status</th>
+</tr>
+</thead>
+
+
+<tbody>
+{printRows.map((r, idx) => (
+<tr key={idx}>
+<td>{r.client}</td>
+<td>{r.title}</td>
+<td>{r.description}</td>
+<td>{r.dateTime}</td>
+<td>{r.status}</td>
+</tr>
+))}
+</tbody>
+</table>
+</div>
+</div>
+
+    </MDBox>
+  )}
+</MDBox>
+
 
               </MDBox>
             )}
