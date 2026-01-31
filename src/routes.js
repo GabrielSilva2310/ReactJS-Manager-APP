@@ -49,6 +49,7 @@ import Icon from "@mui/material/Icon";
 import Logout from "layouts/authentication/logout";
 import AppointmentsTable from "layouts/appointments";
 import WorkingPeriods from "layouts/workingperiods";
+import Clients from "layouts/clients";
 
 const routes = [
   {
@@ -112,6 +113,15 @@ const routes = [
     icon: <Icon fontSize="small">person</Icon>,
     route: "/profile",
     component: <Profile />,
+    private: true,
+  },
+   {
+    type: "collapse",
+    name: "Clientes",
+    key: "clients",
+    icon: <Icon fontSize="small">person</Icon>,
+    route: "/clients",
+    component: <Clients />,
     private: true,
   },
   {
