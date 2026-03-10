@@ -51,7 +51,9 @@ import AppointmentsTable from "layouts/appointments";
 import WorkingPeriods from "layouts/workingperiods";
 import Clients from "layouts/clients";
 
+
 const routes = [
+  /*
   {
     type: "collapse",
     name: "Dashboard",
@@ -61,12 +63,13 @@ const routes = [
     component: <Dashboard />,
     private: true,
   },
+  */
   {
     type: "collapse",
     name: "Agendamentos",
     key: "appointments",
     icon: <Icon fontSize="small">event</Icon>,
-    route: "/tables",
+    route: "/appointments",
     component: <AppointmentsTable />,
     private: true,
   },
@@ -79,6 +82,7 @@ const routes = [
     component: <WorkingPeriods />,
     private: true,
   },
+  /*
   {
     type: "collapse",
     name: "Billing",
@@ -115,6 +119,7 @@ const routes = [
     component: <Profile />,
     private: true,
   },
+  */
    {
     type: "collapse",
     name: "Clientes",

@@ -12,15 +12,17 @@ import {
 } from "@mui/material";
 
 import EditIcon from "@mui/icons-material/Edit";
-import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
+import Chip from "@mui/material/Chip";
 
 import DataTable from "examples/Tables/DataTable";
 import MDBox from "components/MDBox";
 
-import { getClientsPage, createClient, updateClient, deleteClient } from "services/clients";
+import { getClientsPage, createClient, updateClient, cancelClient } from "services/clients";
 import ClientFormDialog from "./components/ClientFormDialog";
 
+import { useAuth } from "contexts/AuthContext";
+import { getTokenData } from "services/auth";
 
 
 export default function Clients() {
@@ -41,15 +43,36 @@ export default function Clients() {
   const [totalPages, setTotalPages] = useState(0);
 
   
+  const tokenData = getTokenData();
+
+  const isAdmin = useMemo(() => {
+  const auth = tokenData?.authorities ?? tokenData?.roles ?? [];
+
+  // aceita ["ROLE_ADMIN"] ou [{ authority: "ROLE_ADMIN" }]
+  return auth.some((r) =>
+    typeof r === "string"
+      ? r === "ROLE_ADMIN"
+      : r?.authority === "ROLE_ADMIN" || r?.name === "ROLE_ADMIN"
+  );
+}, [tokenData?.exp]); // exp muda quando loga/troca token
+
+console.log("tokenData", tokenData);
+console.log("isAdmin", isAdmin)
+
+  const [status, setStatus] = useState("");
+
+  
 
   const loadClients = useCallback(async () => {
     setLoading(true);
     try {
       const params = {
-        page,
-        size,
-        name: search || undefined, // ajuste pro param do back
-      };
+      page,
+      size,
+      name: search || undefined,
+    };
+
+    if (isAdmin && status) params.status = status;
 
       const data = await getClientsPage(params); // ✅ deve retornar Page (com content)
       setRows(data.content ?? []);
@@ -61,7 +84,7 @@ export default function Clients() {
     } finally {
       setLoading(false);
     }
-  }, [page, size, search]);
+  }, [page, size, search, isAdmin, status]);
 
   useEffect(() => {
     loadClients();
@@ -100,33 +123,56 @@ export default function Clients() {
     }
   }
 
-  async function handleDelete(client) {
-    const ok = window.confirm(`Excluir "${client.name}"?`);
-    if (!ok) return;
+  async function handleCancel(client) {
+  const ok = window.confirm(`Inativar "${client.name}"?`);
+  if (!ok) return;
 
-    setLoading(true);
-    try {
-      await deleteClient(client.id);
-      await loadClients();
-    } catch (e) {
-      console.error(e);
-      alert("Erro ao excluir cliente");
-    } finally {
-      setLoading(false);
-    }
+  setLoading(true);
+  try {
+    await cancelClient(client.id);
+    await loadClients();
+  } catch (e) {
+    console.error(e);
+    alert("Erro ao inativar cliente");
+  } finally {
+    setLoading(false);
   }
+}
+
+const isClientActive = (c) =>
+  c?.active === true || c?.status === "ACTIVE" || c?.status === 0;
 
   const columns = useMemo(
     () => [
       { Header: "Nome", accessor: "name", align: "left" },
       { Header: "E-mail", accessor: "email", align: "left" },
       { Header: "Telefone", accessor: "phone", align: "left" },
+          {
+  Header: "Status",
+  accessor: "status",
+  align: "left",
+  Cell: ({ row }) => {
+    const c = row.original;
+    const isActive = isClientActive(c);
+    return (
+      <Chip
+        size="small"
+        label={isActive ? "Ativo" : "Inativo"}
+        sx={{
+          backgroundColor: isActive ? "#43A047" : "#9E9E9E",
+          color: "#fff",
+        }}
+      />
+    );
+  },
+},
       {
         Header: "Ações",
         accessor: "actions",
         align: "center",
         Cell: ({ row }) => {
           const client = row.original;
+          const isActive = isClientActive(client);
           return (
             <MDBox display="flex" justifyContent="center" gap={0.5}>
               <Tooltip title="Editar">
@@ -142,24 +188,28 @@ export default function Clients() {
                 </span>
               </Tooltip>
 
-              <Tooltip title="Excluir">
-                <span>
-                  <IconButton
-                    color="error"
-                    size="small"
-                    onClick={() => handleDelete(client)}
-                    disabled={loading}
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </span>
-              </Tooltip>
+           {isClientActive(client) && (
+          <Tooltip title="Inativar">
+            <span>
+              <IconButton
+                color="error"
+                size="small"
+                onClick={() => handleCancel(client)}
+                disabled={loading}
+              >
+                <i className="material-icons">close</i>
+              </IconButton>
+            </span>
+          </Tooltip>
+        )}
+
             </MDBox>
+            
           );
         },
       },
     ],
-    [loading]
+    [loading, isAdmin]
   );
 
   const tableData = useMemo(() => ({ columns, rows }), [columns, rows]);
@@ -216,6 +266,29 @@ export default function Clients() {
                     disabled={loading}
                   />
                 </Grid>
+                 
+                 {isAdmin && (
+  <Grid item xs={12} md={4}>
+    <TextField
+      select
+      fullWidth
+      size="small"
+      label="Status"
+      value={status}
+      onChange={(e) => {
+        setStatus(e.target.value);
+        setPage(0);
+      }}
+      InputLabelProps={{ shrink: true }}
+      disabled={loading}
+    >
+      <MenuItem value="">Todos</MenuItem>
+      <MenuItem value="ACTIVE">Ativos</MenuItem>
+      <MenuItem value="INACTIVE">Inativos</MenuItem>
+    </TextField>
+  </Grid>
+)}
+
 
                 <Grid
                   item
@@ -232,6 +305,7 @@ export default function Clients() {
                     variant="outlined"
                     onClick={() => {
                       setSearch("");
+                      setStatus("");
                       setPage(0);
                     }}
                     disabled={loading || !search}

@@ -62,7 +62,7 @@ function SignIn() {
       await signIn(email, password); // chama login -> salva token -> chama /me
       // Se quiser usar "lembrar-me" pra persistir em localStorage vs sessionStorage,
       // depois te mostro como ajustar o auth.js pra respeitar esse flag.
-      navigate("/dashboard");
+      navigate("/appointments");
     } catch (err) {
       setError("Usuário ou senha inválidos.");
     } finally {

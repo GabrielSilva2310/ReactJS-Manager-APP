@@ -14,6 +14,9 @@ import Box from "@mui/material/Box";
 import MDBox from "components/MDBox";
 import DashboardLayout from "examples/LayoutContainers/DashboardLayout";
 
+import Snackbar from "@mui/material/Snackbar";
+import Alert from "@mui/material/Alert";
+
 import {
   getWorkingPeriods,
   createWorkingPeriod,
@@ -101,41 +104,57 @@ function WorkingPeriods() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const [snackbar, setSnackbar] = useState({
+  open: false,
+  message: "",
+  severity: "success", // "success" | "error" | "warning" | "info"
+});
+
+const handleCloseSnackbar = (_, reason) => {
+  if (reason === "clickaway") return;
+  setSnackbar((prev) => ({ ...prev, open: false }));
+};
+
+const showToast = (message, severity = "success") => {
+  setSnackbar({ open: true, message, severity });
+};
+
+
   // carrega dados do backend
-  const loadWorkingPeriods = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await getWorkingPeriods(0, 7);
-      const content = Array.isArray(data.content) ? data.content : [];
+  const loadWorkingPeriods = async () => {
+  try {
+    setLoading(true);
+    const data = await getWorkingPeriods(0, 7);
+    const content = Array.isArray(data.content) ? data.content : [];
 
-      const mapped = initialWeek.map((day) => {
-        const match = content.find((wp) => wp.dayOfWeek === day.key);
+    const mapped = initialWeek.map((day) => {
+      const match = content.find((wp) => wp.dayOfWeek === day.key);
 
-        if (!match) {
-          return { ...day, enabled: false, workingPeriodId: null };
-        }
+      if (!match) {
+        return { ...day, enabled: false, workingPeriodId: null };
+      }
 
-        return {
-          ...day,
-          enabled: match.active ?? true,
-          workingPeriodId: match.id,
-          startTime: normalizeTime(match.startTime) || day.startTime,
-          endTime: normalizeTime(match.endTime) || day.endTime,
-        };
-      });
+      return {
+        ...day,
+        enabled: match.active ?? true,
+        workingPeriodId: match.id,
+        startTime: normalizeTime(match.startTime) || day.startTime,
+        endTime: normalizeTime(match.endTime) || day.endTime,
+      };
+    });
 
-      setWeek(mapped);
-    } catch (error) {
-      console.error(error);
-      alert("Erro ao carregar disponibilidade.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    setWeek(mapped);
+  } catch (error) {
+    console.error(error);
+    showToast("Erro ao carregar disponibilidade.", "error");
+  } finally {
+    setLoading(false);
+  }
+};
 
-  useEffect(() => {
-    loadWorkingPeriods();
-  }, [loadWorkingPeriods]);
+ useEffect(() => {
+  loadWorkingPeriods();
+}, []);
 
   const handleToggleDay = (index) => {
     setWeek((prev) => prev.map((d) => (d.index === index ? { ...d, enabled: !d.enabled } : d)));
@@ -148,7 +167,7 @@ function WorkingPeriods() {
   const hasInvalidTimes = () => {
     for (const day of week) {
       if (day.enabled && day.startTime >= day.endTime) {
-        alert(`Verifique os horários de ${day.label}.`);
+        showToast(`Verifique os horários de ${day.label}.`, "warning");
         return true;
       }
     }
@@ -178,10 +197,10 @@ function WorkingPeriods() {
       await Promise.all(promises);
       await loadWorkingPeriods();
 
-      alert("Disponibilidade salva com sucesso!");
+      showToast("Disponibilidade salva com sucesso!");
     } catch (error) {
       console.error(error);
-      alert("Erro ao salvar disponibilidade.");
+      showToast("Erro ao salvar disponibilidade.", "error");
     } finally {
       setSaving(false);
     }
@@ -222,9 +241,31 @@ function WorkingPeriods() {
                   Resetar
                 </Button>
 
-                <Button variant="contained" color="primary" onClick={handleSave} disabled={saving || loading}>
-                  {saving ? "Salvando..." : "Salvar disponibilidade"}
-                </Button>
+                <Button
+  variant="contained"
+  color="primary"
+  onClick={handleSave}
+  disabled={saving || loading}
+  sx={{
+    color: "#fff",
+    "&.Mui-disabled": {
+      color: "#fff",
+      opacity: 0.7, // opcional: mostra que está desabilitado
+    },
+  }}
+>
+  {saving ? "Salvando..." : "Salvar disponibilidade"}
+</Button>
+<Snackbar
+  open={snackbar.open}
+  autoHideDuration={3000}
+  onClose={handleCloseSnackbar}
+  anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+>
+  <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} variant="filled">
+    {snackbar.message}
+  </Alert>
+</Snackbar>
               </CardActions>
             </Card>
           </Grid>

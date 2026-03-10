@@ -2,7 +2,6 @@ import api from "./api";
 
 export async function getClients() {
   const response = await api.get("/clients");
-  // assumindo que o endpoint retorna um Page<ClientDTO>
   return response.data.content || [];
 
 }
@@ -22,7 +21,7 @@ export async function updateClient(id, data) {
    return response.data;
 }
 
-export async function deleteClient(id) {
-  const response = await api.delete(`/clients/${id}`);
-   return response.data;
+export async function cancelClient(id) {
+  const res = await api.patch(`/clients/${id}/cancel`); 
+  return res.data;
 }

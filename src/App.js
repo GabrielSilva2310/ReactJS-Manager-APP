@@ -44,9 +44,7 @@ import { useMaterialUIController, setMiniSidenav, setOpenConfigurator } from "co
 // Helpers de auth
 import { isTokenValid } from "services/auth";
 
-// Images
-import brandWhite from "assets/images/logo-ct.png";
-import brandDark from "assets/images/logo-ct-dark.png";
+import brandLogo from "assets/images/logo.svg";
 
 export default function App() {
   const [controller, dispatch] = useMaterialUIController();
@@ -63,6 +61,12 @@ export default function App() {
   const [onMouseEnter, setOnMouseEnter] = useState(false);
   const [rtlCache, setRtlCache] = useState(null);
   const { pathname } = useLocation();
+
+  const hideSidenav =
+  pathname.startsWith("/authentication") ||
+  pathname === "/" ||
+  pathname.startsWith("/sign-in") ||
+  pathname.startsWith("/sign-up");
 
   // 👉 Flag para exibir/ocultar Configurator e engrenagem
   const SHOW_CONFIGURATOR = false;
@@ -167,48 +171,53 @@ export default function App() {
     <CacheProvider value={rtlCache}>
       <ThemeProvider theme={darkMode ? themeDarkRTL : themeRTL}>
         <CssBaseline />
-        {layout === "dashboard" && (
-          <>
-            <Sidenav
-              color={sidenavColor}
-              brand={(transparentSidenav && !darkMode) || whiteSidenav ? brandDark : brandWhite}
-              brandName="Manager APP"
-              routes={menuRoutes}
-              onMouseEnter={handleOnMouseEnter}
-              onMouseLeave={handleOnMouseLeave}
-            />
-            {SHOW_CONFIGURATOR && <Configurator />}
-            {SHOW_CONFIGURATOR && configsButton}
-          </>
-        )}
-        {layout === "vr" && SHOW_CONFIGURATOR && <Configurator />}
+       {!hideSidenav && (
+  <>
+    <Sidenav
+      color={sidenavColor}
+      brand={brandLogo}
+      brandName="Manager APP"
+      routes={menuRoutes}
+      onMouseEnter={handleOnMouseEnter}
+      onMouseLeave={handleOnMouseLeave}
+    />
+    {SHOW_CONFIGURATOR && <Configurator />}
+    {SHOW_CONFIGURATOR && configsButton}
+  </>
+)}
         <Routes>
           {getRoutes(routes)} {/* ← todas as rotas continuam registradas */}
-          <Route path="*" element={<Navigate to="/authentication/sign-in" replace />} />
+         <Route
+  path="*"
+  element={<Navigate to={auth ? "/appointments" : "/authentication/sign-in"} replace />}
+/>
         </Routes>
       </ThemeProvider>
     </CacheProvider>
   ) : (
     <ThemeProvider theme={darkMode ? themeDark : theme}>
       <CssBaseline />
-      {layout === "dashboard" && (
-        <>
-          <Sidenav
-            color={sidenavColor}
-            brand={(transparentSidenav && !darkMode) || whiteSidenav ? brandDark : brandWhite}
-            brandName="Manager APP"
-            routes={menuRoutes}
-            onMouseEnter={handleOnMouseEnter}
-            onMouseLeave={handleOnMouseLeave}
-          />
-          {SHOW_CONFIGURATOR && <Configurator />}
-          {SHOW_CONFIGURATOR && configsButton}
-        </>
-      )}
-      {layout === "vr" && SHOW_CONFIGURATOR && <Configurator />}
+      {!hideSidenav && (
+  <>
+    <Sidenav
+      color={sidenavColor}
+      brand={brandLogo}
+      brandName="Manager APP"
+      routes={menuRoutes}
+      onMouseEnter={handleOnMouseEnter}
+      onMouseLeave={handleOnMouseLeave}
+    />
+    {SHOW_CONFIGURATOR && <Configurator />}
+    {SHOW_CONFIGURATOR && configsButton}
+  </>
+)}
       <Routes>
         {getRoutes(routes)} {/* ← todas as rotas continuam registradas */}
-        <Route path="*" element={<Navigate to="/authentication/sign-in" replace />} />
+        <Route
+  path="*"
+  element={<Navigate to={auth ? "/appointments" : "/authentication/sign-in"} replace />}
+/>
+
       </Routes>
     </ThemeProvider>
   );
