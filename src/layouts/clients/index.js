@@ -24,6 +24,9 @@ import ClientFormDialog from "./components/ClientFormDialog";
 import { useAuth } from "contexts/AuthContext";
 import { getTokenData } from "services/auth";
 
+import Snackbar from "@mui/material/Snackbar";
+import Alert from "@mui/material/Alert";
+
 
 export default function Clients() {
   const [rows, setRows] = useState([]);
@@ -37,6 +40,22 @@ export default function Clients() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState(null);
+
+  const [snackbar, setSnackbar] = useState({
+  open: false,
+  message: "",
+  severity: "success",
+});
+
+const handleCloseSnackbar = (_, reason) => {
+  if (reason === "clickaway") return;
+  setSnackbar((prev) => ({ ...prev, open: false }));
+};
+
+const showToast = (message, severity = "success") => {
+  setSnackbar({ open: true, message, severity });
+};
+  
 
   const from = totalElements === 0 ? 0 : page * size + 1;
   const to = Math.min((page + 1) * size, totalElements);
@@ -61,34 +80,28 @@ console.log("isAdmin", isAdmin)
 
   const [status, setStatus] = useState("");
 
-  
-
-  const loadClients = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = {
-      page,
-      size,
-      name: search || undefined,
-    };
-
+  const loadClients = async () => {
+  setLoading(true);
+  try {
+    const params = { page, size, name: search || undefined };
     if (isAdmin && status) params.status = status;
 
-      const data = await getClientsPage(params); // ✅ deve retornar Page (com content)
-      setRows(data.content ?? []);
-      setTotalElements(data.totalElements ?? 0);
-      setTotalPages(data.totalPages ?? 0);
-    } catch (e) {
-      console.error(e);
-      alert("Erro ao carregar clientes");
-    } finally {
-      setLoading(false);
-    }
-  }, [page, size, search, isAdmin, status]);
+    const data = await getClientsPage(params);
+    setRows(data.content ?? []);
+    setTotalElements(data.totalElements ?? 0);
+    setTotalPages(data.totalPages ?? 0);
+  } catch (e) {
+    console.error(e);
+    showToast("Erro ao carregar clientes.", "error");
+  } finally {
+    setLoading(false);
+  }
+};
 
-  useEffect(() => {
-    loadClients();
-  }, [loadClients]);
+ 
+ useEffect(() => {
+  loadClients();
+}, [page, size, search, isAdmin, status]);
 
   function openCreate() {
     setEditingClient(null);
@@ -115,9 +128,13 @@ console.log("isAdmin", isAdmin)
       }
       closeDialog();
       await loadClients();
+      showToast(
+  editingClient?.id ? "Cliente atualizado com sucesso!" : "Cliente criado com sucesso!",
+  "success"
+);
     } catch (e) {
       console.error(e);
-      alert("Erro ao salvar cliente");
+      showToast("Erro ao salvar cliente.", "error");
     } finally {
       setLoading(false);
     }
@@ -131,9 +148,10 @@ console.log("isAdmin", isAdmin)
   try {
     await cancelClient(client.id);
     await loadClients();
+    showToast("Cliente inativado com sucesso!", "success");
   } catch (e) {
     console.error(e);
-    alert("Erro ao inativar cliente");
+    showToast("Erro ao inativar cliente.", "error");
   } finally {
     setLoading(false);
   }
@@ -417,6 +435,16 @@ const isClientActive = (c) =>
             loading={loading}
             initialData={editingClient}
           />
+          <Snackbar
+  open={snackbar.open}
+  autoHideDuration={3000}
+  onClose={handleCloseSnackbar}
+  anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+>
+  <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} variant="filled">
+    {snackbar.message}
+  </Alert>
+</Snackbar>
         </CardContent>
       </Card>
     </MDBox>
